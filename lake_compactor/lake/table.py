@@ -1,4 +1,4 @@
-"""LakeTable：建表、追加、发布位置删除、扫描、读者租约、分支绑定。
+"""LakeTable：建表、追加、发布位置删除、扫描、读者租约、分支绑定、结构演进。
 
 数据文件布局（全部在单机本地文件系统上）：
 
@@ -24,6 +24,14 @@
   - 读取（scan / row_ids / ingest_cursors / batch_record）默认解析绑定
     分支的尖端；显式 version 则是全库中的那个提交（可能来自任何分支）。
 
+结构语义（lake/schema_evo.py）：
+
+  - 每个 manifest 可携带 "schemas" 结构历史（最后一项为当前字段定义）；
+    没有该段的旧格式 manifest 按隐式 v0（row_id/value）处理，旧湖表
+    无需迁移。结构变更就是普通 manifest 提交，原子生效。
+  - 每个数据文件条目可带 "schema_version"（缺省 0），读取时按字段 id
+    把物理列映射到读取提交生效的名称与类型。
+
 数据文件带稳定 row_id 列，但删除一律按物理行号（0 起）记录与执行，
 绝不从业务字段（包括 row_id）反推行号。
 """
@@ -42,12 +50,25 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from . import manifest as mf
+from . import schema_evo
 from . import storage
-from .errors import BranchNotFoundError, ConflictError, LeaseError
+from .errors import (
+    BranchNotFoundError,
+    ConflictError,
+    LeaseError,
+    SchemaConflictError,
+    SchemaError,
+)
 
 
 DATA_SCHEMA = pa.schema([("row_id", pa.string()), ("value", pa.int64())])
 DELETE_SCHEMA = pa.schema([("data_file_id", pa.string()), ("pos", pa.int64())])
+
+
+def _maybe_crash(point: str) -> None:
+    """测试钩子：在发布的关键位置硬退出（仅 LAKE_PUBLISH_CRASH_POINT 命中时生效）。"""
+    if os.environ.get("LAKE_PUBLISH_CRASH_POINT") == point:
+        os._exit(42)
 
 
 class LakeTable:
@@ -61,10 +82,25 @@ class LakeTable:
         self.data_dir = os.path.join(self.root, "data")
         self.staging_dir = os.path.join(self.root, "staging")
         self.leases_dir = os.path.join(self.meta_root, "leases")
+        # 测试钩子（默认关闭）：在写入路径“准备完成、进入提交锁之前”回调，
+        # 用于确定性安排“结构变更与旧结构写者竞争”等交错。签名: hook(point)。
+        self._test_pre_commit_hook = None
+
+    def _run_test_hook(self, point: str) -> None:
+        hook = self._test_pre_commit_hook
+        if hook is not None:
+            hook(point)
 
     # ------------------------------------------------------------------ 建表
     @classmethod
-    def create(cls, root: str) -> "LakeTable":
+    def create(cls, root: str, schema=None) -> "LakeTable":
+        """建表。schema=None 建旧式表（隐式 row_id/value 结构，无结构元数据）；
+        schema 为字段定义列表时建结构受管表（首份显式结构即结构版本 1）。
+        字段定义先整体校验，不合法则抛 SchemaEvolutionError，不落任何文件。
+        """
+        schemas = None
+        if schema is not None:
+            schemas = [schema_evo.initial_schema(schema)]
         t = cls(root)
         for d in (
             t.meta_root,
@@ -83,6 +119,8 @@ class LakeTable:
             "delete_files": {},
             "ingest": {"cursors": {}, "batches": {}},
         }
+        if schemas is not None:
+            m0["schemas"] = schemas
         mf.publish_manifest(t.meta_root, m0)
         return t
 
@@ -130,6 +168,7 @@ class LakeTable:
                 f"v{manifest.get('parent')} but branch tip is v{tip}"
             )
         mf.write_manifest(self.meta_root, manifest)
+        _maybe_crash("manifest-written")  # 测试钩子：manifest 已落盘、指针未翻转
         if self.branch == mf.MAIN_BRANCH:
             mf.set_head(self.meta_root, manifest["version"])
         else:
@@ -138,11 +177,12 @@ class LakeTable:
     def _next(self, cur: dict) -> dict:
         """以本线尖端 cur 为父构造下一版本（版本号取全库最大值 + 1）。
 
-        ingest 段（接入游标 + 批次索引）必须随每个新版本原样携带，
-        这样追加 / 删除 / 压实 / 摄取任何一条提交路径都不会丢进度。
-        旧格式 manifest 没有该段，按空状态补齐。
+        ingest 段（接入游标 + 批次索引）与 schemas 段（结构历史）必须随
+        每个新版本原样携带，这样追加 / 删除 / 压实 / 摄取任何一条提交
+        路径都不会丢进度或丢结构定义。旧格式 manifest 没有这两段，按
+        空状态 / 隐式旧式结构处理（不补写，保持旧式表形态）。
         """
-        return {
+        new = {
             "version": mf.next_version(self.meta_root),
             "parent": cur["version"],
             "branch": self.branch,
@@ -153,6 +193,9 @@ class LakeTable:
                 cur.get("ingest") or {"cursors": {}, "batches": {}}
             ),
         }
+        if "schemas" in cur:
+            new["schemas"] = copy.deepcopy(cur["schemas"])
+        return new
 
     # ---------------------------------------------------------------- 分支
     def checkout(self, name: str) -> "LakeTable":
@@ -183,28 +226,184 @@ class LakeTable:
 
         return publish(self, expected_main_version)
 
-    # ---------------------------------------------------------------- 追加
-    def append(self, rows) -> str:
-        """追加一个数据文件，返回新的 data_file_id。rows: [(row_id, value), ...]"""
-        rows = list(rows)
-        fid = uuid.uuid4().hex
-        table = pa.table(
-            {
-                "row_id": pa.array([r[0] for r in rows], pa.string()),
-                "value": pa.array([r[1] for r in rows], pa.int64()),
-            },
-            schema=DATA_SCHEMA,
-        )
-        rel = f"data/data-{fid}.parquet"
-        tmp = os.path.join(self.data_dir, f".tmp-{fid}")
-        pq.write_table(table, tmp)
+    # ---------------------------------------------------------------- 结构
+    def current_schema(self) -> dict:
+        """绑定分支尖端生效的字段定义：{"version": int, "fields": [...]}。
+
+        旧式表（无结构元数据）返回隐式 v0 结构（row_id/value）。写者应在
+        开始处理时读取本方法，把 version 带给 append_rows / ingest_batch。
+        """
+        return copy.deepcopy(schema_evo.current_schema(self._current_manifest()))
+
+    def schema_history(self) -> list[dict]:
+        """完整结构历史（按版本升序，最后一项即当前定义）。"""
+        return copy.deepcopy(schema_evo.schema_chain(self._current_manifest()))
+
+    def evolve_schema(self, fields, expected_schema_version: int | None = None) -> dict:
+        """把当前结构演进为 fields 给出的完整新定义，原子生效。
+
+        规则（全部在提交锁内校验，任一不满足整次拒绝，抛
+        SchemaEvolutionError 并逐条列出）：
+          - 字段身份是稳定 id：改名不改 id；未带 id 的字段按名字继承当前
+            同名字段的 id，全新名字分配从未使用过的新 id；
+          - 类型只能无损扩宽（int32→int64、int32→double、float32→double）；
+          - 可空不可收紧为必填；删除仍被数据文件引用的列拒绝；
+          - 新增必填列必须带 default（旧文件缺少该列时按 default/null 解释）。
+
+        expected_schema_version 给出调用方基于的结构版本，与当前不符时抛
+        SchemaConflictError（乐观并发）。提议与当前完全一致时不产生新提交
+        （返回 changed=False）。成功时新版本随一个 manifest 提交原子发布；
+        中断只会在 versions/ 留下不被引用的孤儿 manifest，HEAD 不动。
+        """
         with self.lock():
-            # 先把数据文件就位，再发布引用它的 manifest，最后翻转本线尖端。
-            os.replace(tmp, os.path.join(self.root, rel))
-            storage.fsync_dir(self.data_dir)
-            new = self._next(self._current_manifest())
-            new["data_files"][fid] = {"path": rel, "num_rows": len(rows)}
+            cur = self._current_manifest()
+            chain = schema_evo.schema_chain(cur)
+            cur_schema = chain[-1]
+            if (
+                expected_schema_version is not None
+                and expected_schema_version != cur_schema["version"]
+            ):
+                raise SchemaConflictError(expected_schema_version, cur_schema["version"])
+            live_versions = [
+                int(meta.get("schema_version", 0))
+                for meta in cur["data_files"].values()
+            ]
+            new_schema = schema_evo.validate_evolution(chain, fields, live_versions)
+            if new_schema["fields"] == cur_schema["fields"]:
+                return {
+                    "changed": False,
+                    "schema_version": cur_schema["version"],
+                    "version": None,
+                    "schema": copy.deepcopy(cur_schema),
+                }
+            new = self._next(cur)
+            new["schemas"] = copy.deepcopy(chain) + [new_schema]
             self._publish(new)
+            return {
+                "changed": True,
+                "schema_version": new_schema["version"],
+                "version": new["version"],
+                "schema": copy.deepcopy(new_schema),
+            }
+
+    # ---------------------------------------------------------------- 追加
+    def append_rows(self, rows, schema_version: int) -> str:
+        """按指定结构版本追加一批行（字段名 -> 值的映射列表），返回 data_file_id。
+
+        行先按该版本的定义校验（未知列 / 缺必填列 / null 违反约束 / 类型
+        不符 → SchemaValidationError，整批拒绝），再按该版本的物理布局
+        写盘。发布时在提交锁内重新确认 schema_version 仍是当前定义；结构
+        已变更则抛 SchemaConflictError，已准备的文件被清理，绝不按新定义
+        静默解释。调用方应重新读取 current_schema 后重试。
+        """
+        rows = list(rows)
+        m0 = self._current_manifest()
+        chain = schema_evo.schema_chain(m0)
+        declared = schema_evo.schema_by_version(chain, int(schema_version))
+        cur0 = chain[-1]
+        if declared["version"] != cur0["version"]:
+            raise SchemaConflictError(declared["version"], cur0["version"])
+        normalized = schema_evo.validate_rows(declared, rows)
+        fid = uuid.uuid4().hex
+        tmp = os.path.join(self.data_dir, f".tmp-{fid}")
+        pq.write_table(schema_evo.build_table(declared, normalized), tmp)
+        self._run_test_hook("append_rows")
+        try:
+            with self.lock():
+                cur = self._current_manifest()
+                cur_version = schema_evo.current_schema(cur)["version"]
+                if cur_version != declared["version"]:
+                    raise SchemaConflictError(declared["version"], cur_version)
+                rel = f"data/data-{fid}.parquet"
+                os.replace(tmp, os.path.join(self.root, rel))
+                tmp = None
+                storage.fsync_dir(self.data_dir)
+                new = self._next(cur)
+                new["data_files"][fid] = {
+                    "path": rel,
+                    "num_rows": len(normalized),
+                    "schema_version": declared["version"],
+                }
+                self._publish(new)
+        finally:
+            if tmp is not None:
+                try:
+                    os.unlink(tmp)
+                except FileNotFoundError:
+                    pass
+        return fid
+
+    def append(self, rows) -> str:
+        """旧式追加：rows 为 (row_id, value) 元组列表，返回 data_file_id。
+
+        旧式表（无结构元数据）上与旧实现逐字节一致：物理列 row_id/value，
+        不记录 schema_version（缺省 0）。已演进的表上按字段 id 1/2 把两个
+        值映射进当前结构（改名不影响），其余列必须可空或带默认值（缺省
+        补 null/默认值）；不满足则抛 SchemaError，请改用 append_rows。
+        """
+        rows = list(rows)
+        m0 = self._current_manifest()
+        if "schemas" not in m0:
+            # 纯旧式路径：与旧实现完全一致，文件诚实地声明隐式 v0 结构。
+            fid = uuid.uuid4().hex
+            table = pa.table(
+                {
+                    "row_id": pa.array([r[0] for r in rows], pa.string()),
+                    "value": pa.array([r[1] for r in rows], pa.int64()),
+                },
+                schema=DATA_SCHEMA,
+            )
+            rel = f"data/data-{fid}.parquet"
+            tmp = os.path.join(self.data_dir, f".tmp-{fid}")
+            pq.write_table(table, tmp)
+            with self.lock():
+                os.replace(tmp, os.path.join(self.root, rel))
+                storage.fsync_dir(self.data_dir)
+                new = self._next(self._current_manifest())
+                new["data_files"][fid] = {"path": rel, "num_rows": len(rows)}
+                self._publish(new)
+            return fid
+
+        cur_schema = schema_evo.current_schema(m0)
+        mapped = schema_evo.legacy_write_mapping(cur_schema)
+        if mapped is None:
+            raise SchemaError(
+                "legacy append((row_id, value)) is not compatible with the "
+                "current schema (field id 1 must be a string column, id 2 "
+                "must accept integer values, and every other column must be "
+                "nullable or have a default); use append_rows(rows, "
+                "schema_version)"
+            )
+        name1, name2 = mapped
+        dicts = [{name1: r[0], name2: r[1]} for r in rows]
+        normalized = schema_evo.validate_rows(cur_schema, dicts)
+        fid = uuid.uuid4().hex
+        tmp = os.path.join(self.data_dir, f".tmp-{fid}")
+        pq.write_table(schema_evo.build_table(cur_schema, normalized), tmp)
+        self._run_test_hook("append")
+        try:
+            with self.lock():
+                cur = self._current_manifest()
+                cur_version = schema_evo.current_schema(cur)["version"]
+                if cur_version != cur_schema["version"]:
+                    raise SchemaConflictError(cur_schema["version"], cur_version)
+                rel = f"data/data-{fid}.parquet"
+                os.replace(tmp, os.path.join(self.root, rel))
+                tmp = None
+                storage.fsync_dir(self.data_dir)
+                new = self._next(cur)
+                new["data_files"][fid] = {
+                    "path": rel,
+                    "num_rows": len(normalized),
+                    "schema_version": cur_schema["version"],
+                }
+                self._publish(new)
+        finally:
+            if tmp is not None:
+                try:
+                    os.unlink(tmp)
+                except FileNotFoundError:
+                    pass
         return fid
 
     # ---------------------------------------------------------- 位置删除
@@ -259,26 +458,41 @@ class LakeTable:
         """固定一个 manifest 版本，按其中的位置删除过滤后返回活行。
 
         version=None 取绑定分支的尖端；显式版本是全库坐标中的提交。
-        位置过滤用 PyArrow 完成：pyarrow.parquet 按文件物理顺序读出行，
-        与删除项的 0 起物理行号严格对应（不依赖任何业务字段）。
+        每个数据文件先按**它写入时的结构版本**把物理列解析成字段 id，
+        再映射到该提交生效的列定义（名称 / 类型 / 可空性）；旧文件缺少
+        的列按 default 或 null 补齐，已扩宽的列无损转换。位置过滤用
+        PyArrow 完成：pyarrow.parquet 按文件物理顺序读出行，与删除项的
+        0 起物理行号严格对应（不依赖任何业务字段）。
         """
         m = self.manifest(version)
+        chain = schema_evo.schema_chain(m)
+        read_schema = chain[-1]
         deletes = self._all_deleted_positions(m)
         out = []
         for fid in sorted(m["data_files"]):
             meta = m["data_files"][fid]
-            t = pq.read_table(os.path.join(self.root, meta["path"]))
+            file_schema = schema_evo.file_schema_of(chain, meta)
+            t = schema_evo.project_file(
+                os.path.join(self.root, meta["path"]), file_schema, read_schema
+            )
             dead = deletes.get(fid)
             if dead:
                 keep = [i for i in range(t.num_rows) if i not in dead]
                 t = t.take(pa.array(keep, pa.int64()))
             out.append(t)
         if not out:
-            return DATA_SCHEMA.empty_table()
+            return schema_evo.arrow_schema(read_schema).empty_table()
         return pa.concat_tables(out)
 
     def row_ids(self, version: int | None = None) -> list[str]:
-        return self.scan(version).column("row_id").to_pylist()
+        """字段 id 1（row_id）在该版本结构下的当前列名取值。"""
+        read_schema = schema_evo.current_schema(self.manifest(version))
+        name = "row_id"
+        for f in read_schema["fields"]:
+            if f["id"] == schema_evo.LEGACY_ROW_ID_FIELD:
+                name = f["name"]
+                break
+        return self.scan(version).column(name).to_pylist()
 
     # ---------------------------------------------------------------- 租约
     @contextmanager

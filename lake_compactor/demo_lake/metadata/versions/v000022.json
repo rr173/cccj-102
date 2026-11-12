@@ -1,22 +1,23 @@
 {
   "branch": "main",
-  "created_at": 1794511593.1753745,
+  "created_at": 1794519262.008359,
   "data_files": {
-    "1e699e897a9847718301020aec9d02c3": {
+    "1357786be1024575a3478e9a70764301": {
+      "num_rows": 2,
+      "path": "data/data-1357786be1024575a3478e9a70764301.parquet"
+    },
+    "50efc29e17f14e379a43981fda30c5bb": {
+      "num_rows": 2,
+      "path": "data/data-50efc29e17f14e379a43981fda30c5bb.parquet"
+    },
+    "83016f21c70642a983d116ee60a5f49b": {
+      "num_rows": 2,
+      "path": "data/data-83016f21c70642a983d116ee60a5f49b.parquet"
+    },
+    "ae7afe7fabe64576819b4104030b87f8": {
       "num_rows": 31,
-      "path": "data/data-1e699e897a9847718301020aec9d02c3.parquet"
-    },
-    "2dcb13feb0b44b5e9cfc31f5056322f1": {
-      "num_rows": 2,
-      "path": "data/data-2dcb13feb0b44b5e9cfc31f5056322f1.parquet"
-    },
-    "8d337d4f328e49dc8953c5ba3044922d": {
-      "num_rows": 2,
-      "path": "data/data-8d337d4f328e49dc8953c5ba3044922d.parquet"
-    },
-    "93c67aae6090441c8ff5213a5e5b1aed": {
-      "num_rows": 2,
-      "path": "data/data-93c67aae6090441c8ff5213a5e5b1aed.parquet"
+      "path": "data/data-ae7afe7fabe64576819b4104030b87f8.parquet",
+      "schema_version": 0
     }
   },
   "delete_files": {},
@@ -75,19 +76,7 @@
         "num_rows": 2,
         "receipt": "rcpt-cec7cc57500c80cf525bfdb111479761",
         "record": "metadata/ingest/batches/batch-b27ba7e59b18cd622374d21e95ab2d81.json",
-        "version": 20
-      },
-      "srcA-1": {
-        "cursors_after": {
-          "srcA": {
-            "0": 4
-          }
-        },
-        "digest": "09ae159ff1ed907a2646ecbda5992001326207f5f0b054ad11a0541e12193e97",
-        "num_rows": 2,
-        "receipt": "rcpt-571cb68175a57f4dfb55a06098392590",
-        "record": "metadata/ingest/batches/batch-02520d10ac18047523d7abb12fa57db9.json",
-        "version": 22
+        "version": 21
       },
       "srcB-0": {
         "cursors_after": {
@@ -99,7 +88,19 @@
         "num_rows": 2,
         "receipt": "rcpt-b728965cadcb915800023c22f6d21f3b",
         "record": "metadata/ingest/batches/batch-8e4f0df8b177deecf6d5bf3f180afe4a.json",
-        "version": 21
+        "version": 20
+      },
+      "srcB-1": {
+        "cursors_after": {
+          "srcB": {
+            "0": 4
+          }
+        },
+        "digest": "426be848aedaa9acbaaee67b8872c24a1b85f44bb34f065738ccb35c75b6cb42",
+        "num_rows": 2,
+        "receipt": "rcpt-67b534b2a80112e0623fd73175b6412c",
+        "record": "metadata/ingest/batches/batch-a15240e7a6a685df3e41ba16713f102c.json",
+        "version": 22
       }
     },
     "cursors": {
@@ -107,10 +108,10 @@
         "0": 2
       },
       "srcA": {
-        "0": 4
+        "0": 2
       },
       "srcB": {
-        "0": 2
+        "0": 4
       },
       "train": {
         "0": 3,

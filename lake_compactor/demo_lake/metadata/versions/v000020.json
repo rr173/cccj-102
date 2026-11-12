@@ -1,14 +1,15 @@
 {
   "branch": "main",
-  "created_at": 1794511593.166737,
+  "created_at": 1794519262.0002682,
   "data_files": {
-    "1e699e897a9847718301020aec9d02c3": {
-      "num_rows": 31,
-      "path": "data/data-1e699e897a9847718301020aec9d02c3.parquet"
-    },
-    "8d337d4f328e49dc8953c5ba3044922d": {
+    "1357786be1024575a3478e9a70764301": {
       "num_rows": 2,
-      "path": "data/data-8d337d4f328e49dc8953c5ba3044922d.parquet"
+      "path": "data/data-1357786be1024575a3478e9a70764301.parquet"
+    },
+    "ae7afe7fabe64576819b4104030b87f8": {
+      "num_rows": 31,
+      "path": "data/data-ae7afe7fabe64576819b4104030b87f8.parquet",
+      "schema_version": 0
     }
   },
   "delete_files": {},
@@ -57,16 +58,16 @@
         "record": "metadata/ingest/batches/batch-600a25414f30f35786fe32b722d52cad.json",
         "version": 18
       },
-      "srcA-0": {
+      "srcB-0": {
         "cursors_after": {
-          "srcA": {
+          "srcB": {
             "0": 2
           }
         },
-        "digest": "2c97bfef30296e7de6fc83360cc5799d1cf8a5615ded7c934fef39780150cfc0",
+        "digest": "20c70e6ed4644eed6391fe3120bd8c126b7287fc2bffc493596b2f682807fe48",
         "num_rows": 2,
-        "receipt": "rcpt-cec7cc57500c80cf525bfdb111479761",
-        "record": "metadata/ingest/batches/batch-b27ba7e59b18cd622374d21e95ab2d81.json",
+        "receipt": "rcpt-b728965cadcb915800023c22f6d21f3b",
+        "record": "metadata/ingest/batches/batch-8e4f0df8b177deecf6d5bf3f180afe4a.json",
         "version": 20
       }
     },
@@ -74,7 +75,7 @@
       "eval": {
         "0": 2
       },
-      "srcA": {
+      "srcB": {
         "0": 2
       },
       "train": {

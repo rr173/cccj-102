@@ -1,0 +1,39 @@
+{
+  "batch_key": "experiment-sample-batch",
+  "branch": "exp-alpha",
+  "created_at": 1794519269.0057015,
+  "cursors_after": {
+    "train": {
+      "0": 3
+    }
+  },
+  "cursors_before": {},
+  "data_file_id": "205f2b069fed43f6b2f556dfa5b4bfde",
+  "digest": "1d44958f54a7d0959c1ce05c5c665d15010dcbc6008258d0491055a2fbfb92cd",
+  "messages": [
+    [
+      "train",
+      "0",
+      0,
+      "exp-i0000",
+      500
+    ],
+    [
+      "train",
+      "0",
+      1,
+      "exp-i0001",
+      501
+    ],
+    [
+      "train",
+      "0",
+      2,
+      "exp-i0002",
+      502
+    ]
+  ],
+  "num_rows": 3,
+  "receipt": "rcpt-76ee3d131b05ffbeb9f6ba4f8c681c62",
+  "version": 5
+}

@@ -1,0 +1,43 @@
+{
+  "batch_key": "shared-key-001",
+  "branch": "line-b",
+  "created_at": 1794519269.1570747,
+  "cursors_after": {
+    "branch-src": {
+      "0": 3
+    }
+  },
+  "cursors_before": {
+    "train": {
+      "0": 3
+    }
+  },
+  "data_file_id": "45f80b69c5b342428127abb81b990afb",
+  "digest": "0f90684010abf384d33d3d852a73d1545604836c8eada1c85cb04e09ea24b429",
+  "messages": [
+    [
+      "branch-src",
+      "0",
+      0,
+      "shared0000",
+      600
+    ],
+    [
+      "branch-src",
+      "0",
+      1,
+      "shared0001",
+      601
+    ],
+    [
+      "branch-src",
+      "0",
+      2,
+      "shared0002",
+      602
+    ]
+  ],
+  "num_rows": 3,
+  "receipt": "rcpt-5347f328b5bb277a73208001f14c88c5",
+  "version": 10
+}

@@ -1,0 +1,53 @@
+{
+  "branch": "exp-alpha",
+  "created_at": 1794519269.0056856,
+  "data_files": {
+    "205f2b069fed43f6b2f556dfa5b4bfde": {
+      "num_rows": 3,
+      "path": "data/data-205f2b069fed43f6b2f556dfa5b4bfde.parquet"
+    },
+    "64421dec417e49fab7fc6232c5238a7d": {
+      "num_rows": 3,
+      "path": "data/data-64421dec417e49fab7fc6232c5238a7d.parquet"
+    },
+    "81c2e34b500449d3842a039e9009d756": {
+      "num_rows": 3,
+      "path": "data/data-81c2e34b500449d3842a039e9009d756.parquet"
+    }
+  },
+  "delete_files": {
+    "6b66d02cc6b54747b0edb9adb93f5e6b": {
+      "num_deletes": 1,
+      "path": "data/deletes-6b66d02cc6b54747b0edb9adb93f5e6b.parquet",
+      "target": "81c2e34b500449d3842a039e9009d756"
+    },
+    "f5c917f03610473891b1c890283e12bc": {
+      "num_deletes": 1,
+      "path": "data/deletes-f5c917f03610473891b1c890283e12bc.parquet",
+      "target": "64421dec417e49fab7fc6232c5238a7d"
+    }
+  },
+  "ingest": {
+    "batches": {
+      "experiment-sample-batch": {
+        "cursors_after": {
+          "train": {
+            "0": 3
+          }
+        },
+        "digest": "1d44958f54a7d0959c1ce05c5c665d15010dcbc6008258d0491055a2fbfb92cd",
+        "num_rows": 3,
+        "receipt": "rcpt-76ee3d131b05ffbeb9f6ba4f8c681c62",
+        "record": "metadata/ingest/batches/batch-d6b6088f90138f6fcc07f8ff8764b30b-b6f10df26d984f20.json",
+        "version": 5
+      }
+    },
+    "cursors": {
+      "train": {
+        "0": 3
+      }
+    }
+  },
+  "parent": 4,
+  "version": 5
+}

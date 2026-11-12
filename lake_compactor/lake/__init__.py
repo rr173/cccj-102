@@ -21,6 +21,10 @@ from .errors import (
     QueryExecutionError,
     QueryReferenceError,
     QuerySyntaxError,
+    SchemaConflictError,
+    SchemaError,
+    SchemaEvolutionError,
+    SchemaValidationError,
     SourceIsMainError,
     SplitConflictError,
     SplitError,
@@ -55,6 +59,7 @@ from .splits import (
     split_identity,
 )
 from .table import DATA_SCHEMA, DELETE_SCHEMA, LakeTable
+from . import schema_evo
 from . import verify
 from .workbench import (
     DuckDBWorkbench,
@@ -97,11 +102,16 @@ __all__ = [
     "query",
     "query_arrow",
     "validate_statement",
+    "schema_evo",
     "LakeError",
     "ConflictError",
     "LeaseError",
     "BatchRejectedError",
     "IdempotencyConflictError",
+    "SchemaError",
+    "SchemaEvolutionError",
+    "SchemaValidationError",
+    "SchemaConflictError",
     "SplitError",
     "SplitConflictError",
     "BranchError",

@@ -1,18 +1,20 @@
 {
   "branch": "main",
-  "created_at": 1794511592.9138567,
+  "created_at": 1794519261.8053546,
   "data_files": {
-    "216c76aceef84bdbbdee67fce7ae6a88": {
+    "99410a59e7194e2b882227676c8ace5f": {
       "num_rows": 10,
-      "path": "data/data-216c76aceef84bdbbdee67fce7ae6a88.parquet"
+      "path": "data/data-99410a59e7194e2b882227676c8ace5f.parquet",
+      "schema_version": 0
     },
-    "255189629b1f4767acb6eff616fe0754": {
-      "num_rows": 10,
-      "path": "data/data-255189629b1f4767acb6eff616fe0754.parquet"
-    },
-    "63604d8d63514107917e54aa42a98775": {
+    "b94d6ceb5d8b42629a7ff782115fe3d6": {
       "num_rows": 4,
-      "path": "data/data-63604d8d63514107917e54aa42a98775.parquet"
+      "path": "data/data-b94d6ceb5d8b42629a7ff782115fe3d6.parquet"
+    },
+    "f24e85d5fe3c4b01a69aac2835e7f39d": {
+      "num_rows": 10,
+      "path": "data/data-f24e85d5fe3c4b01a69aac2835e7f39d.parquet",
+      "schema_version": 0
     }
   },
   "delete_files": {},

@@ -1,0 +1,27 @@
+{
+  "branch": "exp-alpha",
+  "created_at": 1794519268.9876902,
+  "data_files": {
+    "64421dec417e49fab7fc6232c5238a7d": {
+      "num_rows": 3,
+      "path": "data/data-64421dec417e49fab7fc6232c5238a7d.parquet"
+    },
+    "81c2e34b500449d3842a039e9009d756": {
+      "num_rows": 3,
+      "path": "data/data-81c2e34b500449d3842a039e9009d756.parquet"
+    }
+  },
+  "delete_files": {
+    "f5c917f03610473891b1c890283e12bc": {
+      "num_deletes": 1,
+      "path": "data/deletes-f5c917f03610473891b1c890283e12bc.parquet",
+      "target": "64421dec417e49fab7fc6232c5238a7d"
+    }
+  },
+  "ingest": {
+    "batches": {},
+    "cursors": {}
+  },
+  "parent": 2,
+  "version": 3
+}

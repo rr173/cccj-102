@@ -150,6 +150,52 @@ class SplitError(LakeError):
     """
 
 
+class SchemaError(LakeError):
+    """字段结构（schema）相关错误的基类：结构定义、结构演进、按结构校验数据。"""
+
+
+class SchemaEvolutionError(SchemaError):
+    """结构变更被拒绝：违反演进规则，整次变更不生效。
+
+    ``reasons`` 逐条列出不满足的规则（重复 ID、缩窄类型、删除仍被文件
+    引用的列、没有默认值的必填列等），调用方可据此修正后重新提交。
+    拒绝路径只读：结构、版本与数据文件都不变。
+    """
+
+    def __init__(self, reasons):
+        self.reasons = [str(r) for r in reasons]
+        super().__init__("schema evolution rejected: " + "; ".join(self.reasons))
+
+
+class SchemaValidationError(SchemaError):
+    """写入的数据不符合指定结构版本（未知列、缺必填列、null 违反约束、类型不符）。
+
+    整批拒绝：任何一行不合法，整批不入湖。``reasons`` 逐条列出违规行与字段。
+    """
+
+    def __init__(self, reasons):
+        self.reasons = [str(r) for r in reasons]
+        super().__init__("rows rejected by schema validation: " + "; ".join(self.reasons))
+
+
+class SchemaConflictError(ConflictError, SchemaError):
+    """写者携带的结构版本在发布时已不是当前定义（结构已变更）。
+
+    写者在开始处理时读到结构版本 S，发布时当前版本已变为 S'：写入明确
+    失败，绝不按新定义静默解释已准备好的数据。调用方应重新读取当前
+    结构、按新定义校验/补齐数据后重试。
+    """
+
+    def __init__(self, expected, actual):
+        self.expected = expected
+        self.actual = actual
+        super().__init__(
+            f"schema changed during write: prepared under schema v{expected}, "
+            f"but current schema is v{actual}; the write was not applied "
+            f"(re-read the current schema and retry)"
+        )
+
+
 class SplitConflictError(LakeError):
     """目标交付目录已存在但身份不同，不能替换旧数据。"""
 

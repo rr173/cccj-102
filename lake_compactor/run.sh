@@ -16,21 +16,24 @@ else
 fi
 
 echo "==> 使用解释器: $PY"
-echo "==> [1/7] 自动化校验（pytest，真实读写 Parquet、真实多进程交错、定点崩溃恢复）"
+echo "==> [1/8] 自动化校验（pytest，真实读写 Parquet、真实多进程交错、定点崩溃恢复）"
 "$PY" -m pytest -v
-echo "==> [2/7] 压实/摄取端到端演示（demo.py）"
+echo "==> [2/8] 压实/摄取端到端演示（demo.py）"
 "$PY" demo.py
-echo "==> [3/7] 数据质量画像自动化校验（tests/test_quality.py，含可手算样本）"
+echo "==> [3/8] 数据质量画像自动化校验（tests/test_quality.py，含可手算样本）"
 "$PY" -m pytest tests/test_quality.py -v
-echo "==> [4/7] 数据质量画像端到端演示（demo_quality.py）"
+echo "==> [4/8] 数据质量画像端到端演示（demo_quality.py）"
 "$PY" demo_quality.py
-echo "==> [5/7] 成组抽样切分自动化校验 + 端到端演示（tests/test_split.py / demo_split.py）"
+echo "==> [5/8] 成组抽样切分自动化校验 + 端到端演示（tests/test_split.py / demo_split.py）"
 "$PY" -m pytest tests/test_split.py -v
 "$PY" demo_split.py
-echo "==> [6/7] 查询工作台自动化校验 + 端到端演示（tests/test_workbench.py / demo_workbench.py）"
+echo "==> [6/8] 查询工作台自动化校验 + 端到端演示（tests/test_workbench.py / demo_workbench.py）"
 "$PY" -m pytest tests/test_workbench.py -v
 "$PY" demo_workbench.py
-echo "==> [7/7] 实验分支自动化校验 + 端到端演示（tests/test_branches.py / demo_branches.py）"
+echo "==> [7/8] 实验分支自动化校验 + 端到端演示（tests/test_branches.py / demo_branches.py）"
 "$PY" -m pytest tests/test_branches.py -v
 "$PY" demo_branches.py
+echo "==> [8/8] 字段身份与结构演进自动化校验 + 端到端演示（tests/test_schema.py / demo_schema.py）"
+"$PY" -m pytest tests/test_schema.py -v
+"$PY" demo_schema.py
 echo "==> 全部完成"

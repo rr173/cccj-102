@@ -1,0 +1,17 @@
+{
+  "branch": "main",
+  "created_at": 1794519268.8756225,
+  "data_files": {
+    "64421dec417e49fab7fc6232c5238a7d": {
+      "num_rows": 3,
+      "path": "data/data-64421dec417e49fab7fc6232c5238a7d.parquet"
+    }
+  },
+  "delete_files": {},
+  "ingest": {
+    "batches": {},
+    "cursors": {}
+  },
+  "parent": 0,
+  "version": 1
+}

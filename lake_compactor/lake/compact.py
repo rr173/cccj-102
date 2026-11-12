@@ -27,6 +27,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from . import manifest as mf
+from . import schema_evo
 from . import storage
 from .errors import BranchMismatchError, ConflictError
 from .table import DELETE_SCHEMA, LakeTable
@@ -71,6 +72,11 @@ def create_plan(
     pdir = _plan_dir(table, plan_id)
     os.makedirs(pdir)
 
+    # 读取与扫描共用同一套字段映射：选中文件可以各是不同的历史物理格式，
+    # 统一映射到基版本生效的逻辑结构后再合并；候选文件即按该结构落盘，
+    # 并记录其结构版本（提交时写进文件条目，后续读取据此解析）。
+    chain = schema_evo.schema_chain(base)
+    read_schema = chain[-1]
     deletes = table._all_deleted_positions(base)
     merged_id = uuid.uuid4().hex
     mapping: dict[str, list[list[int]]] = {}  # old_fid -> [[old_pos, new_pos], ...]
@@ -79,7 +85,10 @@ def create_plan(
     new_pos = 0
     for fid in selected:
         meta = base["data_files"][fid]
-        t = pq.read_table(os.path.join(table.root, meta["path"]))
+        file_schema = schema_evo.file_schema_of(chain, meta)
+        t = schema_evo.project_file(
+            os.path.join(table.root, meta["path"]), file_schema, read_schema
+        )
         dead = deletes.get(fid, set())
         keep = [i for i in range(t.num_rows) if i not in dead]
         mapping[fid] = [[p, new_pos + i] for i, p in enumerate(keep)]
@@ -105,6 +114,7 @@ def create_plan(
         "num_rows": total,
         "mapping": mapping,
         "absorbed": absorbed,
+        "schema_version": read_schema["version"],
         "state": "executed",
         "created_at": time.time(),
     }
@@ -146,6 +156,8 @@ def commit_plan(table: LakeTable, plan_id: str) -> int:
         merged_file = plan["merged_file"]
 
         # 1) 候选数据文件从 staging 移入 data/（先就位，后发布）。
+        #    候选按基版本的结构落盘并如实记录其结构版本：即使提交时结构
+        #    已演进，读取侧也能按字段 id 正确解析，不存在静默错读。
         new_data_files: dict[str, dict] = {}
         if merged_file is not None:
             rel = f"data/data-{merged_file}.parquet"
@@ -154,7 +166,11 @@ def commit_plan(table: LakeTable, plan_id: str) -> int:
                 os.path.join(table.root, rel),
             )
             storage.fsync_dir(table.data_dir)
-            new_data_files[merged_file] = {"path": rel, "num_rows": plan["num_rows"]}
+            new_data_files[merged_file] = {
+                "path": rel,
+                "num_rows": plan["num_rows"],
+                "schema_version": int(plan.get("schema_version", 0)),
+            }
 
         # 2) 删除文件分类：无关的带走、基版本已有的吸收、新到的翻译。
         carried: dict[str, dict] = {}

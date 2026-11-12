@@ -1,10 +1,10 @@
 {
   "branch": "main",
-  "created_at": 1794511592.6628351,
+  "created_at": 1794519261.52368,
   "data_files": {
-    "24e82a14a34640d688294546a4fa66e8": {
+    "6a33a2f511454d6b9f5e5ad82b255e4c": {
       "num_rows": 8,
-      "path": "data/data-24e82a14a34640d688294546a4fa66e8.parquet"
+      "path": "data/data-6a33a2f511454d6b9f5e5ad82b255e4c.parquet"
     }
   },
   "delete_files": {},

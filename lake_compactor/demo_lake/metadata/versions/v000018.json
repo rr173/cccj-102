@@ -1,22 +1,23 @@
 {
   "branch": "main",
-  "created_at": 1794511593.1304514,
+  "created_at": 1794519261.9636705,
   "data_files": {
-    "6281a34c877a4743b33531c5b40e5521": {
-      "num_rows": 4,
-      "path": "data/data-6281a34c877a4743b33531c5b40e5521.parquet"
-    },
-    "83c4f690461a4da3877a448658206580": {
-      "num_rows": 2,
-      "path": "data/data-83c4f690461a4da3877a448658206580.parquet"
-    },
-    "995fe7aa5bd7439981cc150ab03aa502": {
+    "264f9d1969fc4fb08e4c6f403715c0ea": {
       "num_rows": 24,
-      "path": "data/data-995fe7aa5bd7439981cc150ab03aa502.parquet"
+      "path": "data/data-264f9d1969fc4fb08e4c6f403715c0ea.parquet",
+      "schema_version": 0
     },
-    "f5a9647062c84e5d920a3a3cf1fd232a": {
+    "5d13b6083e2e4b2985fb35ffc6054c0e": {
+      "num_rows": 4,
+      "path": "data/data-5d13b6083e2e4b2985fb35ffc6054c0e.parquet"
+    },
+    "7af2f95c040f4ebab93b21df59361130": {
       "num_rows": 1,
-      "path": "data/data-f5a9647062c84e5d920a3a3cf1fd232a.parquet"
+      "path": "data/data-7af2f95c040f4ebab93b21df59361130.parquet"
+    },
+    "ddc677faaffd403d91c22ae407e157aa": {
+      "num_rows": 2,
+      "path": "data/data-ddc677faaffd403d91c22ae407e157aa.parquet"
     }
   },
   "delete_files": {},

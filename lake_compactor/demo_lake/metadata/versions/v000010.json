@@ -1,21 +1,22 @@
 {
   "branch": "main",
-  "created_at": 1794511592.8744125,
+  "created_at": 1794519261.7545526,
   "data_files": {
-    "63604d8d63514107917e54aa42a98775": {
-      "num_rows": 4,
-      "path": "data/data-63604d8d63514107917e54aa42a98775.parquet"
-    },
-    "c95f25375c1645b0981bd53e9628b5b4": {
+    "0f536583950f42f28cb7468eb0a31cde": {
       "num_rows": 11,
-      "path": "data/data-c95f25375c1645b0981bd53e9628b5b4.parquet"
+      "path": "data/data-0f536583950f42f28cb7468eb0a31cde.parquet",
+      "schema_version": 0
+    },
+    "b94d6ceb5d8b42629a7ff782115fe3d6": {
+      "num_rows": 4,
+      "path": "data/data-b94d6ceb5d8b42629a7ff782115fe3d6.parquet"
     }
   },
   "delete_files": {
-    "b41c4b0f02754ffb82677d5abc122865": {
+    "33eb250f8af6499ba80df47a16f36a9c": {
       "num_deletes": 1,
-      "path": "data/deletes-b41c4b0f02754ffb82677d5abc122865.parquet",
-      "target": "c95f25375c1645b0981bd53e9628b5b4"
+      "path": "data/deletes-33eb250f8af6499ba80df47a16f36a9c.parquet",
+      "target": "0f536583950f42f28cb7468eb0a31cde"
     }
   },
   "ingest": {

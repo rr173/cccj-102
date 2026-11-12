@@ -1,0 +1,49 @@
+{
+  "branch": "exp-temp",
+  "created_at": 1794519269.3136597,
+  "data_files": {
+    "5bb24a6c64454df8a8a3bc07d10ef65a": {
+      "num_rows": 1,
+      "path": "data/data-5bb24a6c64454df8a8a3bc07d10ef65a.parquet"
+    },
+    "e69ff4ce2ef04078a07e3549e5109e99": {
+      "num_rows": 7,
+      "path": "data/data-e69ff4ce2ef04078a07e3549e5109e99.parquet",
+      "schema_version": 0
+    },
+    "ea538cba8dc34abdb06af56a5136cf7a": {
+      "num_rows": 2,
+      "path": "data/data-ea538cba8dc34abdb06af56a5136cf7a.parquet"
+    }
+  },
+  "delete_files": {
+    "040c7a7231404e1d8bdb3008b294ec58": {
+      "num_deletes": 1,
+      "path": "data/deletes-040c7a7231404e1d8bdb3008b294ec58.parquet",
+      "target": "ea538cba8dc34abdb06af56a5136cf7a"
+    }
+  },
+  "ingest": {
+    "batches": {
+      "experiment-sample-batch": {
+        "cursors_after": {
+          "train": {
+            "0": 3
+          }
+        },
+        "digest": "1d44958f54a7d0959c1ce05c5c665d15010dcbc6008258d0491055a2fbfb92cd",
+        "num_rows": 3,
+        "receipt": "rcpt-76ee3d131b05ffbeb9f6ba4f8c681c62",
+        "record": "metadata/ingest/batches/batch-d6b6088f90138f6fcc07f8ff8764b30b-b6f10df26d984f20.json",
+        "version": 5
+      }
+    },
+    "cursors": {
+      "train": {
+        "0": 3
+      }
+    }
+  },
+  "parent": 15,
+  "version": 16
+}

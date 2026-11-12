@@ -1,0 +1,62 @@
+{
+  "branch": "line-a",
+  "created_at": 1794519269.2059975,
+  "data_files": {
+    "5bb24a6c64454df8a8a3bc07d10ef65a": {
+      "num_rows": 1,
+      "path": "data/data-5bb24a6c64454df8a8a3bc07d10ef65a.parquet"
+    },
+    "70e4c41f1db94c9db3418a73da1b7314": {
+      "num_rows": 3,
+      "path": "data/data-70e4c41f1db94c9db3418a73da1b7314.parquet"
+    },
+    "88c4947a802a44c19ffed184ea0f158b": {
+      "num_rows": 1,
+      "path": "data/data-88c4947a802a44c19ffed184ea0f158b.parquet"
+    },
+    "e69ff4ce2ef04078a07e3549e5109e99": {
+      "num_rows": 7,
+      "path": "data/data-e69ff4ce2ef04078a07e3549e5109e99.parquet",
+      "schema_version": 0
+    }
+  },
+  "delete_files": {},
+  "ingest": {
+    "batches": {
+      "experiment-sample-batch": {
+        "cursors_after": {
+          "train": {
+            "0": 3
+          }
+        },
+        "digest": "1d44958f54a7d0959c1ce05c5c665d15010dcbc6008258d0491055a2fbfb92cd",
+        "num_rows": 3,
+        "receipt": "rcpt-76ee3d131b05ffbeb9f6ba4f8c681c62",
+        "record": "metadata/ingest/batches/batch-d6b6088f90138f6fcc07f8ff8764b30b-b6f10df26d984f20.json",
+        "version": 5
+      },
+      "shared-key-001": {
+        "cursors_after": {
+          "branch-src": {
+            "0": 3
+          }
+        },
+        "digest": "0f90684010abf384d33d3d852a73d1545604836c8eada1c85cb04e09ea24b429",
+        "num_rows": 3,
+        "receipt": "rcpt-a6db2e01f29cfeb371750ce461919763",
+        "record": "metadata/ingest/batches/batch-cf87b2027e1dbc3bc07b490b941a79ba-9e7c81d0e08a0efd.json",
+        "version": 9
+      }
+    },
+    "cursors": {
+      "branch-src": {
+        "0": 3
+      },
+      "train": {
+        "0": 3
+      }
+    }
+  },
+  "parent": 9,
+  "version": 11
+}
