@@ -1,17 +1,17 @@
 {
-  "created_at": 1794472186.0713809,
+  "created_at": 1794476711.2238958,
   "data_files": {
-    "11a9e98b91e24152a9c189b6bfae366d": {
+    "1acac4be4bfb4d7c847acad91bfa15ee": {
       "num_rows": 2,
-      "path": "data/data-11a9e98b91e24152a9c189b6bfae366d.parquet"
+      "path": "data/data-1acac4be4bfb4d7c847acad91bfa15ee.parquet"
     },
-    "9b9b6b5bf138443b81f94e0b352a919b": {
+    "e06526015c5e4e9692eef9511ca63df4": {
+      "num_rows": 2,
+      "path": "data/data-e06526015c5e4e9692eef9511ca63df4.parquet"
+    },
+    "f775dadd15a34225a0b5811b664d3b4c": {
       "num_rows": 31,
-      "path": "data/data-9b9b6b5bf138443b81f94e0b352a919b.parquet"
-    },
-    "d93f26f3e25f4f51a9695b033c1565e8": {
-      "num_rows": 2,
-      "path": "data/data-d93f26f3e25f4f51a9695b033c1565e8.parquet"
+      "path": "data/data-f775dadd15a34225a0b5811b664d3b4c.parquet"
     }
   },
   "delete_files": {},
@@ -70,7 +70,7 @@
         "num_rows": 2,
         "receipt": "rcpt-cec7cc57500c80cf525bfdb111479761",
         "record": "metadata/ingest/batches/batch-b27ba7e59b18cd622374d21e95ab2d81.json",
-        "version": 21
+        "version": 20
       },
       "srcB-0": {
         "cursors_after": {
@@ -82,7 +82,7 @@
         "num_rows": 2,
         "receipt": "rcpt-b728965cadcb915800023c22f6d21f3b",
         "record": "metadata/ingest/batches/batch-8e4f0df8b177deecf6d5bf3f180afe4a.json",
-        "version": 20
+        "version": 21
       }
     },
     "cursors": {

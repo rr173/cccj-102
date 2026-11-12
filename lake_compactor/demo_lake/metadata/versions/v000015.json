@@ -1,9 +1,9 @@
 {
-  "created_at": 1794472185.89355,
+  "created_at": 1794476711.0442526,
   "data_files": {
-    "b9724040aae74fde8e17e48f86e20c7f": {
+    "46b880834261443db758831d266e6192": {
       "num_rows": 24,
-      "path": "data/data-b9724040aae74fde8e17e48f86e20c7f.parquet"
+      "path": "data/data-46b880834261443db758831d266e6192.parquet"
     }
   },
   "delete_files": {},

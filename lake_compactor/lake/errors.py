@@ -41,3 +41,14 @@ class IdempotencyConflictError(LakeError):
             f"batch_key {batch_key!r} already committed at version {version} "
             f"with different content (receipt {receipt!r})"
         )
+
+
+class RuleSpecError(LakeError):
+    """画像规则本身格式错误。
+
+    与“数据触犯规则”不同：规则格式错误时不生成、不落盘任何报告。
+    """
+
+
+class ProfileNotFoundError(LakeError):
+    """指定（修订号, 规则摘要）身份的质量画像不存在。"""

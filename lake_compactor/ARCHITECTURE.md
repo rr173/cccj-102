@@ -172,3 +172,42 @@ HEAD 一次翻转生效：**这就是唯一可见性边界**，不存在“先�
 测试实际读写 Parquet、实际 fork 子进程，用同步屏障精确安排
 “计划生成—额外删除—提交”与“摄取—压实—提交”的交错，用测试钩子
 在摄取提交的关键位置硬退出，并用 DuckDB 核对 row_id 多重集。
+
+## 10. 数据质量画像（lake/quality/）
+
+画像为交付前冻结的质量检查结果，与数据修订号一一对应：
+
+```
+<root>/quality_profiles/
+  LOCK                                跨进程互斥（flock，独立于 metadata/LOCK）
+  reports/revNNNNNN-<digest12>.json   冻结报告，0444 只读，永不改写
+  .tmp-<random>                       发布前临时文件（与正式目录分离）
+```
+
+- **身份与不可变**：唯一身份 = 修订号 + 规则摘要（规范化规则的
+  SHA-256）。重复请求直接返回原报告（`reused=true`）；另一组规则摘要
+  不同，写另一个文件，绝不覆盖。规则格式错误在任何 IO 之前被
+  `RuleSpecError` 拒绝，不落盘任何报告；数据触犯规则仍保存完整画像，
+  失败项进 `verdicts`。
+- **计数口径**：固定修订号 manifest → 归组位置删除 → 逐文件
+  `ParquetFile.iter_batches` 分批产出可见行（`profile.iter_visible_batches`），
+  聚合器任何时刻只持有一个 RecordBatch 与一个主标识频次字典，全表不进
+  Python 列表。统计的是查询结果而非分片 `num_rows` 相加；修订号在扫描
+  开始前固定，扫描期间表继续提交不影响结果。分段左闭右开，null 不计入
+  分段与上下界。
+- **读者保护**：`ProfileStore.create_or_get` 在 `table.lease(version)`
+  租约内完成扫描，租约与 GC 共用表的提交锁，输入文件不会在统计途中被
+  回收。
+- **原子发布与崩溃恢复**：临时文件写在 `quality_profiles/` 根目录，
+  fsync 后 `os.replace` 到 `reports/` 并 fsync 目录，再 chmod 0444。
+  发布前任何时刻退出，`reports/` 下都不会出现半成品；下次相同请求在
+  锁内确认目标缺失后清掉 `.tmp` 残骸并重新计算（测试钩子
+  `LAKE_QUALITY_CRASH_POINT=prepared|computed|staged` 覆盖三个中断点，
+  用真实 `os._exit` 的子进程验证）。
+- **与数据解耦**：画像目录不在 GC 的扫描范围内，报告内容自包含；
+  原始数据文件被整理/回收后，`show`/`compare` 只依赖报告 JSON。
+- **比较**：`compare_reports` 对两份报告输出全部标量/分段指标差值
+  （新 - 旧），并按规则名匹配异常，分为新出现、消失、持续三类。
+- **参考程序**：`quality/reference.py` 不 import 生产扫描/聚合代码，
+  用独立的纯 Python 逐行路径重算同一批指标，供小样本手算交叉核对
+  （`cross_check`）。

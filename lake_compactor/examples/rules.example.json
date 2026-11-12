@@ -1,0 +1,10 @@
+{
+  "min_samples": 8,
+  "max_duplicate_ids": 0,
+  "value_bounds": {"min": 0, "max": 100},
+  "buckets": [
+    {"name": "high", "lower": 90, "upper": 101},
+    {"name": "low", "lower": 0, "upper": 10},
+    {"name": "mid", "lower": 10, "upper": 90}
+  ]
+}

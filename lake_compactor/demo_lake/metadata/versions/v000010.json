@@ -1,20 +1,20 @@
 {
-  "created_at": 1794472185.7880926,
+  "created_at": 1794476710.8703227,
   "data_files": {
-    "5356962b2f0941288b51a71c25e50767": {
+    "132eb54a94f24a3fa95114ba1bc912b4": {
       "num_rows": 11,
-      "path": "data/data-5356962b2f0941288b51a71c25e50767.parquet"
+      "path": "data/data-132eb54a94f24a3fa95114ba1bc912b4.parquet"
     },
-    "5408eae1d8ba4becadc6eff41974200c": {
+    "b93997d1f043405ab572444f1bc4ef63": {
       "num_rows": 4,
-      "path": "data/data-5408eae1d8ba4becadc6eff41974200c.parquet"
+      "path": "data/data-b93997d1f043405ab572444f1bc4ef63.parquet"
     }
   },
   "delete_files": {
-    "99fbb89101354e33aa8c4564e188cb0d": {
+    "db031258439b4dde80576adfe655bf48": {
       "num_deletes": 1,
-      "path": "data/deletes-99fbb89101354e33aa8c4564e188cb0d.parquet",
-      "target": "5356962b2f0941288b51a71c25e50767"
+      "path": "data/deletes-db031258439b4dde80576adfe655bf48.parquet",
+      "target": "132eb54a94f24a3fa95114ba1bc912b4"
     }
   },
   "ingest": {
