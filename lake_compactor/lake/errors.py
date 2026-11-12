@@ -255,3 +255,32 @@ class QueryExecutionError(WorkbenchError):
     """查询执行失败：类型转换、除零、内存不足等运行期错误。"""
 
     kind = "query"
+
+
+class PrivacyViewError(LakeError):
+    """隐私视图无法建立或读取。
+
+    所有错误都必须在**交出第一批结果之前**判定（读取途中的 I/O 失败
+    除外，它在语义上就是“没有再交出新批次”）。错误文本刻意只引用字段
+    id、别名与规则动作，**绝不**包含 HMAC key、原始客户编号或任何数据
+    值——异常文本本身也是泄漏面。
+
+    ``kind`` 标明拒绝发生在哪一层：
+
+      - ``key``        缺少 HMAC key（环境变量与内存参数都没提供），
+                       或 key 形状不合法；
+      - ``rule``       规则形状不合法、动作未知、别名缺失/冲突、
+                       截断粒度未知、同一字段 id 给出多条规则；
+      - ``field``      规则绑定的字段 id 在所选提交的结构里不存在；
+      - ``type``       目标列类型不支持该动作（假名只接受 string，
+                       时间截断只接受 timestamp）；
+      - ``version``    所选提交版本不存在或其文件已被回收；
+      - ``read``       读取途中数据文件不可用（I/O / Arrow 错误）。
+    """
+
+    kind = "read"
+
+    def __init__(self, message: str, *, kind: str | None = None):
+        if kind is not None:
+            self.kind = kind
+        super().__init__(message)

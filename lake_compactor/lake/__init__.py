@@ -16,6 +16,7 @@ from .errors import (
     LeaseError,
     MappingError,
     PermissionBoundaryError,
+    PrivacyViewError,
     ProtectedBranchError,
     PublishError,
     QueryExecutionError,
@@ -67,6 +68,16 @@ from .workbench import (
     query,
     query_arrow,
     validate_statement,
+)
+from .privacy import (
+    DEFAULT_BATCH_SIZE as PRIVACY_DEFAULT_BATCH_SIZE,
+    DEFAULT_ENV_VAR as PRIVACY_ENV_VAR,
+    HIDE,
+    PSEUDONYMIZE,
+    TRUNCATE_TIME,
+    PrivacyView,
+    open_privacy_view,
+    privacy_batches,
 )
 
 __all__ = [
@@ -132,4 +143,13 @@ __all__ = [
     "QueryReferenceError",
     "QueryExecutionError",
     "PermissionBoundaryError",
+    "PrivacyViewError",
+    "open_privacy_view",
+    "privacy_batches",
+    "PrivacyView",
+    "HIDE",
+    "PSEUDONYMIZE",
+    "TRUNCATE_TIME",
+    "PRIVACY_ENV_VAR",
+    "PRIVACY_DEFAULT_BATCH_SIZE",
 ]

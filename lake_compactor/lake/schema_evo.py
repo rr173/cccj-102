@@ -31,6 +31,7 @@ Parquet 文件同时存在。本模块提供**一套**字段映射规则，供�
 
 from __future__ import annotations
 
+import datetime
 import math
 from collections.abc import Mapping
 
@@ -42,6 +43,9 @@ from .errors import SchemaError, SchemaEvolutionError, SchemaValidationError
 # --------------------------------------------------------------------------
 # 逻辑类型注册表与无损扩宽关系
 # --------------------------------------------------------------------------
+# timestamp 统一落到 Arrow 的微秒精度无时区时间戳（pa.timestamp("us")），
+# 供隐私视图把事件时间截到日/月；逻辑类型只承诺“时间点”语义，不承诺
+# 比微秒更细的精度。
 _TYPE_REGISTRY = {
     "bool": pa.bool_(),
     "int32": pa.int32(),
@@ -49,6 +53,7 @@ _TYPE_REGISTRY = {
     "float32": pa.float32(),
     "double": pa.float64(),
     "string": pa.string(),
+    "timestamp": pa.timestamp("us"),
 }
 _INT_RANGES = {
     "int32": (-(2**31), 2**31 - 1),
@@ -156,6 +161,10 @@ def value_matches(type_name: str, value) -> bool:
         return isinstance(value, (int, float)) and not isinstance(value, bool)
     if type_name == "string":
         return isinstance(value, str)
+    if type_name == "timestamp":
+        # 只接受“朴素”本地时间（无时区信息）；带 tzinfo 的值与无时区
+        # Arrow 时间戳语义不同，必须由调用方先显式转换，避免静默偏移。
+        return isinstance(value, datetime.datetime) and value.tzinfo is None
     return False
 
 
@@ -430,8 +439,28 @@ def build_table(schema: dict, normalized_rows: list[dict]) -> pa.Table:
 
 
 # --------------------------------------------------------------------------
-# 读取映射：物理文件 -> 指定结构版本的逻辑表（扫描 / 压实共用）
+# 读取映射：物理文件 -> 指定结构版本的逻辑表（扫描 / 压实 / 隐私视图共用）
 # --------------------------------------------------------------------------
+def projection_plan(
+    physical_names: set[str], file_schema: dict, read_schema: dict
+) -> list[tuple[dict, str | None]]:
+    """给出 read_schema 每个逻辑字段对应的物理列名（缺列时为 None）。
+
+    物理列按**文件写入时的结构版本**（file_schema）解析出字段 id，再按
+    read_schema 落到当前名称与类型。扫描整表（project_file）与隐私视图的
+    逐批读取共用这一份计划，保证任何读入口都不自行猜测字段含义。
+    """
+    file_by_id = {f["id"]: f for f in file_schema["fields"]}
+    plan = []  # (read_field, physical_name or None)
+    for rf in read_schema["fields"]:
+        ff = file_by_id.get(rf["id"])
+        if ff is None or ff["name"] not in physical_names:
+            plan.append((rf, None))
+        else:
+            plan.append((rf, ff["name"]))
+    return plan
+
+
 def project_file(path: str, file_schema: dict, read_schema: dict) -> pa.Table:
     """把一个物理 Parquet 文件映射为 read_schema 要求的逻辑表。
 
@@ -442,15 +471,8 @@ def project_file(path: str, file_schema: dict, read_schema: dict) -> pa.Table:
       - 类型已无损扩宽的列：cast 到目标类型（扩宽是精确的，不会失败）；
       - 文件里多出的、read_schema 已不包含的列：忽略（不进入逻辑表）。
     """
-    file_by_id = {f["id"]: f for f in file_schema["fields"]}
     physical_names = set(pq.read_schema(path).names)
-    plan = []  # (read_field, physical_name or None)
-    for rf in read_schema["fields"]:
-        ff = file_by_id.get(rf["id"])
-        if ff is None or ff["name"] not in physical_names:
-            plan.append((rf, None))
-        else:
-            plan.append((rf, ff["name"]))
+    plan = projection_plan(physical_names, file_schema, read_schema)
 
     to_read = [pname for _, pname in plan if pname is not None]
     if to_read:
@@ -480,6 +502,42 @@ def project_file(path: str, file_schema: dict, read_schema: dict) -> pa.Table:
             col = col.cast(target)  # 演进规则保证这里只会是无损扩宽
         arrays.append(col)
     return pa.Table.from_arrays(arrays, schema=arrow_schema(read_schema))
+
+
+def project_batch(
+    batch: pa.RecordBatch,
+    plan: list[tuple[dict, str | None]],
+    total_rows: int,
+) -> pa.RecordBatch:
+    """把一个物理 RecordBatch 按 projection_plan 映射为逻辑批次。
+
+    与 project_file 同语义但不做整表读取：物理缺失列按 default/null 补齐，
+    扩宽列无损 cast。隐私视图按批调用，任何时刻只持有一个批次。
+    """
+    arrays = []
+    fields = []
+    for rf, pname in plan:
+        target = arrow_type(rf["type"])
+        if pname is None:
+            if "default" in rf:
+                fill = rf["default"]
+            elif rf["nullable"]:
+                fill = None
+            else:
+                raise SchemaError(
+                    f"field {rf['name']!r} (id {rf['id']}): column missing in "
+                    "the physical batch and the field has no default"
+                )
+            arrays.append(pa.array([fill] * total_rows, type=target))
+        else:
+            col = batch.column(batch.schema.get_field_index(pname))
+            if col.type != target:
+                col = col.cast(target)  # 演进规则保证这里只会是无损扩宽
+            arrays.append(col)
+        fields.append(
+            pa.field(rf["name"], target, nullable=rf["nullable"])
+        )
+    return pa.RecordBatch.from_arrays(arrays, schema=pa.schema(fields))
 
 
 def file_schema_of(chain: list[dict], file_meta: dict) -> dict:

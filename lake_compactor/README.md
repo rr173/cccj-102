@@ -29,19 +29,26 @@ Python + PyArrow + DuckDB，元数据用本机文件与 flock 实现，单机多
   删除仍被引用的列 / 重复 id / 缩窄类型 / 无默认值的必填列一律拒绝；
   结构随 manifest 原子生效，新旧物理格式并存由同一套字段映射读取，
   旧湖表无需迁移（见 [SCHEMA.md](SCHEMA.md)）
+- **临时隐私视图**：合作方隔离联调时按已提交版本与绑定稳定字段 id 的
+  规则逐批取得脱敏 Arrow 批次——隐藏字段、客户编号 HMAC 稳定假名（同 key
+  跨表跨运行可连接、不同客户不撞值）、事件时间截到日/月；结果仅供当前
+  进程，不写回湖表、不生成导出目录、不保存转换数据，key 只经环境/内存
+  提供且不进配置/manifest/metadata/异常/日志，读者租约在提前关闭、下游
+  抛错或读取失败时必释放（见 [PRIVACY.md](PRIVACY.md)）
 
 ## 运行
 
 ```bash
-./run.sh                 # 自动化校验 + 压实/摄取/质量画像/切分/查询工作台/分支/结构演进演示
+./run.sh                 # 自动化校验 + 压实/摄取/质量画像/切分/查询工作台/分支/结构演进/隐私视图演示
 # 或分别运行：
-python3 -m pytest -v     # 144 个端到端用例（真实读写 Parquet、真实多进程交错）
+python3 -m pytest -v     # 164 个端到端用例（真实读写 Parquet、真实多进程交错）
 python3 demo.py          # 叙述式演示 12 个场景
 python3 demo_quality.py  # 质量画像 10 个验收场景（本地样本、可手算核对）
 python3 demo_split.py    # 成组抽样切分 11 个验收场景
 python3 demo_workbench.py  # 查询工作台 5 组验收场景
 python3 demo_branches.py   # 实验分支 9 步验收（隔离/快进/拒绝分叉/并发接入/回收/重开）
 python3 demo_schema.py     # 结构演进 11 步验收（滚动升级/混合压实/逐项拒绝/竞争/崩溃/旧目录）
+python3 demo_privacy.py    # 隐私视图 6 组验收（假名连接/截断空值/抗改名/保护释放/源表不变/透传）
 python3 check_split.py <交付目录> --verify-assignment   # 独立分组校验脚本
 ```
 
@@ -84,6 +91,42 @@ result       # pyarrow.Table
 
 CLI：`python3 -m lake.workbench.cli query --source NAME=DIR:VERSION ...`；
 详见 [WORKBENCH.md](WORKBENCH.md) 与 `examples/workbench.example.json`。
+
+## 临时隐私视图（privacy view）
+
+合作方在隔离环境联调模型，但不能拿到生产客户编号或精确事件时间。选定一个
+已提交版本与一组绑定稳定字段 id 的规则，逐批取得脱敏 Arrow 批次：
+
+```python
+from lake.privacy import open_privacy_view
+
+rules = [
+    {"field_id": 5, "action": "hide"},
+    {"field_id": 3, "action": "pseudonymize", "alias": "customer_pid"},
+    {"field_id": 4, "action": "truncate_time",
+     "granularity": "day", "alias": "event_day"},
+]
+with open_privacy_view(table, rules, version=12,
+                       hmac_key=b"shared-secret") as view:
+    for batch in view:        # pyarrow.RecordBatch，按 batch 转换、取完即释放
+        ...
+```
+
+- 规则绑定**稳定 field id**：列改名后规则仍作用于目标列；列被删除、缺 key、
+  目标列类型不合适都在**第一批结果前**报错（`PrivacyViewError.kind` 为
+  field/key/type/rule/version/read），不泄出数据、不残留租约；
+- 假名 = `HMAC-SHA256(key, 域前缀||客户编号)` 前 16 字节十六进制：同 key 下
+  两张表的同一客户跨运行可按假名连接，不同客户不撞值；`null` 仍为 `null`；
+- key 只经内存参数（`hmac_key=`）或环境变量（`LAKE_PRIVACY_HMAC_KEY`）提供，
+  不进配置、manifest、Arrow metadata、异常文本或日志，视图关闭即丢弃；
+- 只读、不落盘：不写回湖表、不推进版本、不生成导出目录、不保存转换结果；
+  不运行 SQL、不接受 Python 表达式；
+- 读者租约覆盖整个迭代，正常读完 / 提前 `break` / 下游抛错 / 读取失败都在
+  生成器 finally 中释放，之后 GC 可回收该版本；
+- 空规则（`[]` 或 `None`）即按字段 id 映射原样透传，可见行口径与 `scan()`
+  一致（含位置删除、缺列补 null、无损扩宽）。
+
+详见 [PRIVACY.md](PRIVACY.md)；验收演示 `python3 demo_privacy.py`。
 
 ## 数据质量画像（quality profile）
 
@@ -241,6 +284,10 @@ t.scan(old_version)                                # 旧提交按当时生效的
 | `lake/workbench/registry.py` | 逻辑名称登记表：名称 -> (湖表目录, 精确版本)，读取前统一定位 manifest |
 | `lake/workbench/engine.py` | DuckDB 查询工作台：只读语句校验、计划边界检查、可见行流式装载、读者租约、结果组装 |
 | `lake/workbench/cli.py` | 查询工作台命令行入口（query/spec，CSV / JSON Lines / Arrow） |
+| `lake/privacy/rules.py` | 隐私字段规则规范化与校验（绑定稳定 field id：hide/pseudonymize/truncate_time） |
+| `lake/privacy/key.py` | HMAC key 解析（内存参数优先，其次环境变量；不进配置/manifest/异常/日志） |
+| `lake/privacy/transform.py` | HMAC 稳定假名、时间截断原语与输出列规划（只含允许别名，schema 无 metadata） |
+| `lake/privacy/view.py` | 隐私视图：版本定位 + 读者租约、逐批字段 id 投影与转换、全路径租约释放 |
 | `check_split.py` | 独立分组校验脚本（只读交付目录，可复算归属） |
 | `tests/test_engine.py` | 压实引擎校验（屏障交错、冲突、崩溃、租约、原子发布压力） |
 | `tests/test_ingest.py` | 摄取事务校验（多分片、重发、争抢、并发、崩溃恢复、旧表兼容） |
@@ -249,15 +296,18 @@ t.scan(old_version)                                # 旧提交按当时生效的
 | `tests/test_workbench.py` | 查询工作台验收（独立期望行集、连接/分组、双版本对照、取数途中追加+压实+GC 的读者保护、空结果 schema、逐项拒绝与湖表不变） |
 | `tests/test_branches.py` | 实验分支验收（旧目录对应 main、名字/冲突、共享建立、全库唯一号与父链、写入隔离、同键并发接入隔离、跨线压实拒绝、快进/分叉/过期拒绝、整理与修改并存、撤销后租约保护再回收、重开持久化） |
 | `tests/test_schema.py` | 结构演进验收（滚动升级逐版本核对、混合格式压实、逐项拒绝、错误输入、发布竞争、发布中断重开、旧目录免迁移、重开一致性） |
+| `tests/test_privacy.py` | 隐私视图验收（跨表假名连接与独立逐行核对、逐批峰值缓冲、抗改名、删列/缺 key/坏类型首批前拒绝、停止/异常/读取失败租约必释放、GC 衔接、源表不变与无 metadata、无规则透传） |
 | `demo.py` | 叙述式端到端演示 |
 | `demo_quality.py` | 质量画像叙述式演示（10 个验收场景） |
 | `demo_split.py` | 成组抽样切分叙述式演示（11 个验收场景） |
 | `demo_workbench.py` | 查询工作台叙述式演示（5 组验收场景） |
 | `demo_branches.py` | 实验分支叙述式演示（9 步验收，逐步断言完整内容与状态） |
 | `demo_schema.py` | 结构演进叙述式演示（11 步验收：滚动升级/混合压实/逐项拒绝/竞争/崩溃/旧目录） |
+| `demo_privacy.py` | 隐私视图叙述式演示（6 组验收：假名连接/截断空值/抗改名/保护释放/源表不变/透传） |
 | `QUALITY.md` | 画像规则配置、报告字段、接口与存储语义说明 |
 | `SPLIT.md` | 成组抽样切分的参数、算法、清单字段与交付语义 |
 | `WORKBENCH.md` | 查询工作台的登记表、查询语法、读者保护、安全边界与 CLI 说明 |
 | `BRANCHES.md` | 实验分支的名字规则、接口、隔离语义、publish 快进规则与回收口径 |
 | `SCHEMA.md` | 字段身份、结构版本、演进规则、读取映射与写入契约说明 |
+| `PRIVACY.md` | 临时隐私视图的字段规则、HMAC 假名与 key 纪律、读者保护、错误分类与边界 |
 | `ARCHITECTURE.md` | 架构说明 |

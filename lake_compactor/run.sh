@@ -33,7 +33,10 @@ echo "==> [6/8] 查询工作台自动化校验 + 端到端演示（tests/test_wo
 echo "==> [7/8] 实验分支自动化校验 + 端到端演示（tests/test_branches.py / demo_branches.py）"
 "$PY" -m pytest tests/test_branches.py -v
 "$PY" demo_branches.py
-echo "==> [8/8] 字段身份与结构演进自动化校验 + 端到端演示（tests/test_schema.py / demo_schema.py）"
+echo "==> [8/9] 字段身份与结构演进自动化校验 + 端到端演示（tests/test_schema.py / demo_schema.py）"
 "$PY" -m pytest tests/test_schema.py -v
 "$PY" demo_schema.py
+echo "==> [9/9] 临时隐私视图自动化校验 + 端到端演示（tests/test_privacy.py / demo_privacy.py）"
+"$PY" -m pytest tests/test_privacy.py -v
+"$PY" demo_privacy.py
 echo "==> 全部完成"
