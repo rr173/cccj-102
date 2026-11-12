@@ -16,7 +16,7 @@ else
 fi
 
 echo "==> 使用解释器: $PY"
-echo "==> [1/2] 自动化校验（pytest，真实读写 Parquet、真实多进程交错）"
+echo "==> [1/2] 自动化校验（pytest，真实读写 Parquet、真实多进程交错、定点崩溃恢复）"
 "$PY" -m pytest -v
 echo "==> [2/2] 端到端演示（demo.py）"
 "$PY" demo.py

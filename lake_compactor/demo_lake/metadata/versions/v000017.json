@@ -1,0 +1,64 @@
+{
+  "created_at": 1794472185.984371,
+  "data_files": {
+    "6562c2068ea540a6a507c8f0fa20f809": {
+      "num_rows": 2,
+      "path": "data/data-6562c2068ea540a6a507c8f0fa20f809.parquet"
+    },
+    "b4b7ba943b6f45f3a47f3e2e7b2939b1": {
+      "num_rows": 4,
+      "path": "data/data-b4b7ba943b6f45f3a47f3e2e7b2939b1.parquet"
+    },
+    "b9724040aae74fde8e17e48f86e20c7f": {
+      "num_rows": 24,
+      "path": "data/data-b9724040aae74fde8e17e48f86e20c7f.parquet"
+    }
+  },
+  "delete_files": {},
+  "ingest": {
+    "batches": {
+      "demo-batch-1": {
+        "cursors_after": {
+          "eval": {
+            "0": 1
+          },
+          "train": {
+            "0": 2,
+            "1": 1
+          }
+        },
+        "digest": "0793c8a043410fd1f73a19a4a8be396cfcb718c87d9024ca485a05598dc1f389",
+        "num_rows": 4,
+        "receipt": "rcpt-0c02735070d993209393b1bbe0f65e6a",
+        "record": "metadata/ingest/batches/batch-a6832aa23e2be1b69cae62302c2f903d.json",
+        "version": 16
+      },
+      "demo-batch-2": {
+        "cursors_after": {
+          "eval": {
+            "0": 2
+          },
+          "train": {
+            "0": 3
+          }
+        },
+        "digest": "35a85bd33bcc8af3d368978b26427532223b40434a1b88f865f81c4ac4291958",
+        "num_rows": 2,
+        "receipt": "rcpt-e8243b8cdd70f5e9ac19120710447e0b",
+        "record": "metadata/ingest/batches/batch-c16b5d6f71afe46088e39f765740feca.json",
+        "version": 17
+      }
+    },
+    "cursors": {
+      "eval": {
+        "0": 2
+      },
+      "train": {
+        "0": 3,
+        "1": 1
+      }
+    }
+  },
+  "parent": 16,
+  "version": 17
+}

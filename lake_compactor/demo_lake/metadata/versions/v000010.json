@@ -1,0 +1,26 @@
+{
+  "created_at": 1794472185.7880926,
+  "data_files": {
+    "5356962b2f0941288b51a71c25e50767": {
+      "num_rows": 11,
+      "path": "data/data-5356962b2f0941288b51a71c25e50767.parquet"
+    },
+    "5408eae1d8ba4becadc6eff41974200c": {
+      "num_rows": 4,
+      "path": "data/data-5408eae1d8ba4becadc6eff41974200c.parquet"
+    }
+  },
+  "delete_files": {
+    "99fbb89101354e33aa8c4564e188cb0d": {
+      "num_deletes": 1,
+      "path": "data/deletes-99fbb89101354e33aa8c4564e188cb0d.parquet",
+      "target": "5356962b2f0941288b51a71c25e50767"
+    }
+  },
+  "ingest": {
+    "batches": {},
+    "cursors": {}
+  },
+  "parent": 9,
+  "version": 10
+}

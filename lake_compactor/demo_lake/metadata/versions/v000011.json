@@ -1,0 +1,20 @@
+{
+  "created_at": 1794472185.791698,
+  "data_files": {
+    "5408eae1d8ba4becadc6eff41974200c": {
+      "num_rows": 4,
+      "path": "data/data-5408eae1d8ba4becadc6eff41974200c.parquet"
+    },
+    "bc02ba15190142908e2020b51ec66614": {
+      "num_rows": 10,
+      "path": "data/data-bc02ba15190142908e2020b51ec66614.parquet"
+    }
+  },
+  "delete_files": {},
+  "ingest": {
+    "batches": {},
+    "cursors": {}
+  },
+  "parent": 10,
+  "version": 11
+}

@@ -1,0 +1,45 @@
+{
+  "created_at": 1794472185.9750826,
+  "data_files": {
+    "b4b7ba943b6f45f3a47f3e2e7b2939b1": {
+      "num_rows": 4,
+      "path": "data/data-b4b7ba943b6f45f3a47f3e2e7b2939b1.parquet"
+    },
+    "b9724040aae74fde8e17e48f86e20c7f": {
+      "num_rows": 24,
+      "path": "data/data-b9724040aae74fde8e17e48f86e20c7f.parquet"
+    }
+  },
+  "delete_files": {},
+  "ingest": {
+    "batches": {
+      "demo-batch-1": {
+        "cursors_after": {
+          "eval": {
+            "0": 1
+          },
+          "train": {
+            "0": 2,
+            "1": 1
+          }
+        },
+        "digest": "0793c8a043410fd1f73a19a4a8be396cfcb718c87d9024ca485a05598dc1f389",
+        "num_rows": 4,
+        "receipt": "rcpt-0c02735070d993209393b1bbe0f65e6a",
+        "record": "metadata/ingest/batches/batch-a6832aa23e2be1b69cae62302c2f903d.json",
+        "version": 16
+      }
+    },
+    "cursors": {
+      "eval": {
+        "0": 1
+      },
+      "train": {
+        "0": 2,
+        "1": 1
+      }
+    }
+  },
+  "parent": 15,
+  "version": 16
+}

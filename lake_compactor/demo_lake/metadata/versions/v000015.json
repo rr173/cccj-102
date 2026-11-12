@@ -1,0 +1,16 @@
+{
+  "created_at": 1794472185.89355,
+  "data_files": {
+    "b9724040aae74fde8e17e48f86e20c7f": {
+      "num_rows": 24,
+      "path": "data/data-b9724040aae74fde8e17e48f86e20c7f.parquet"
+    }
+  },
+  "delete_files": {},
+  "ingest": {
+    "batches": {},
+    "cursors": {}
+  },
+  "parent": 14,
+  "version": 15
+}

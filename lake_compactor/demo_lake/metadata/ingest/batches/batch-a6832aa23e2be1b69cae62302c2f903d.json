@@ -1,0 +1,49 @@
+{
+  "batch_key": "demo-batch-1",
+  "created_at": 1794472185.9751136,
+  "cursors_after": {
+    "eval": {
+      "0": 1
+    },
+    "train": {
+      "0": 2,
+      "1": 1
+    }
+  },
+  "cursors_before": {},
+  "data_file_id": "b4b7ba943b6f45f3a47f3e2e7b2939b1",
+  "digest": "0793c8a043410fd1f73a19a4a8be396cfcb718c87d9024ca485a05598dc1f389",
+  "messages": [
+    [
+      "eval",
+      "0",
+      0,
+      "e0-0000",
+      200
+    ],
+    [
+      "train",
+      "0",
+      0,
+      "t0-0000",
+      100
+    ],
+    [
+      "train",
+      "0",
+      1,
+      "t0-0001",
+      101
+    ],
+    [
+      "train",
+      "1",
+      0,
+      "t1-0000",
+      110
+    ]
+  ],
+  "num_rows": 4,
+  "receipt": "rcpt-0c02735070d993209393b1bbe0f65e6a",
+  "version": 16
+}

@@ -1,0 +1,16 @@
+{
+  "created_at": 1794472185.5729713,
+  "data_files": {
+    "8076db7602fb453d81581421c602df52": {
+      "num_rows": 8,
+      "path": "data/data-8076db7602fb453d81581421c602df52.parquet"
+    }
+  },
+  "delete_files": {},
+  "ingest": {
+    "batches": {},
+    "cursors": {}
+  },
+  "parent": 0,
+  "version": 1
+}

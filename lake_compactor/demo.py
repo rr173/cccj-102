@@ -1,4 +1,4 @@
-"""端到端演示：碎片 Parquet 湖表压实引擎。
+"""端到端演示：碎片 Parquet 湖表压实引擎 + 可重放微批摄取。
 
 依次演示：
   1. 建表、追加碎片文件（含空文件）、发布位置删除（同文件多条、全删文件）
@@ -8,6 +8,11 @@
   5. 两个压实者重叠选文件 -> 冲突
   6. 发布前崩溃留下候选 -> GC 清理
   7. 租约保护旧版本 -> 释放后 GC 清理
+  8. 微批摄取：多分片一批、批内乱序、游标与 receipt 一起生效
+  9. 确认超时重发：乱序重发返回原 receipt；改内容则幂等冲突
+ 10. 缺号 / 重复 / 交叠：整批拒绝，合法消息可再次摄取
+ 11. 确认前崩溃：重启重放找到原 receipt（真实子进程）
+ 12. 两个接入进程与压实同时工作：互不覆盖
 
 运行：python3 demo.py
 """
@@ -24,7 +29,9 @@ import pyarrow as pa
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from lake import (  # noqa: E402
+    BatchRejectedError,
     ConflictError,
+    IdempotencyConflictError,
     LakeTable,
     collect,
     commit_plan,
@@ -74,6 +81,29 @@ def crashing_child():
     t = LakeTable.open(ROOT)
     create_plan(t, max_rows=10_000)
     os._exit(1)
+
+
+# ---- 场景 11/12 的子进程：摄取确认前崩溃 / 并发接入 ------------------------
+def crashing_sender_child(batch_key, batch, crash_point):
+    os.environ["LAKE_INGEST_CRASH_POINT"] = crash_point  # 测试钩子：定点硬退出
+    t = LakeTable.open(ROOT)
+    t.ingest_batch(batch_key, batch)
+
+
+def ingest_worker_child(source, n, barrier, q):
+    t = LakeTable.open(ROOT)
+    barrier.wait(60)
+    for i in range(n):
+        t.ingest_batch(
+            f"{source}-{i}",
+            [
+                {"source": source, "partition": 0, "offset": 2 * i,
+                 "row_id": f"{source}-{2 * i:04d}", "value": 2 * i},
+                {"source": source, "partition": 0, "offset": 2 * i + 1,
+                 "row_id": f"{source}-{2 * i + 1:04d}", "value": 2 * i + 1},
+            ],
+        )
+    q.put(("done", source))
 
 
 def main() -> None:
@@ -177,6 +207,89 @@ def main() -> None:
     assert all(not os.path.exists(os.path.join(ROOT, p_)) for p_ in old_files)
     verify.assert_same_multiset(t.scan(), snap)
     ok("当前版本内容不变，旧文件已清理")
+
+    banner("8. 微批摄取：多分片一批、批内乱序、游标与数据同一事务生效")
+    batch = [
+        {"source": "train", "partition": 0, "offset": 1, "row_id": "t0-0001", "value": 101},
+        {"source": "train", "partition": 0, "offset": 0, "row_id": "t0-0000", "value": 100},
+        {"source": "train", "partition": 1, "offset": 0, "row_id": "t1-0000", "value": 110},
+        {"source": "eval", "partition": 0, "offset": 0, "row_id": "e0-0000", "value": 200},
+    ]
+    r = t.ingest_batch("demo-batch-1", batch)
+    ok(f"receipt={r['receipt']}  生效版本 v{r['version']}  行数 {r['num_rows']}")
+    ok(f"各分片新游标: {r['cursors']}")
+    ok(f"进度查询 ingest_cursors(): {t.ingest_cursors()}")
+
+    banner("9. 确认超时重发：乱序重发返回原 receipt；改内容则幂等冲突")
+    r2 = t.ingest_batch("demo-batch-1", list(reversed(batch)))  # 顺序打乱的重发
+    assert r2["receipt"] == r["receipt"] and r2["replayed"]
+    ok(f"乱序重发 -> 原 receipt（replayed=True），版本仍 v{t.current_version()}，未加行")
+    tampered = [dict(m) for m in batch]
+    tampered[0]["value"] = 999
+    try:
+        t.ingest_batch("demo-batch-1", tampered)
+        raise SystemExit("改内容重发应当冲突")
+    except IdempotencyConflictError as e:
+        ok(f"改内容重发 -> 幂等冲突: {e}")
+
+    banner("10. 缺号 / 重复 / 交叠：整批拒绝；合法消息可再次摄取")
+    try:
+        t.ingest_batch("demo-bad", [
+            {"source": "train", "partition": 0, "offset": 5, "row_id": "x", "value": 1},
+            {"source": "eval", "partition": 0, "offset": 1, "row_id": "y", "value": 2},
+        ])
+        raise SystemExit("缺号应当整批拒绝")
+    except BatchRejectedError as e:
+        ok(f"train/0 游标在 2 却发来 5 -> 整批拒绝: {e.reasons[0]}")
+    ok(f"合法的 eval/0 也未被推进: {t.ingest_cursors()}")
+    r3 = t.ingest_batch("demo-batch-2", [
+        {"source": "train", "partition": 0, "offset": 2, "row_id": "t0-0002", "value": 102},
+        {"source": "eval", "partition": 0, "offset": 1, "row_id": "e0-0001", "value": 201},
+    ])
+    ok(f"修正后重发成功: 游标 {r3['cursors']}")
+
+    banner("11. 确认前崩溃：重启重放找到原 receipt（真实子进程硬退出）")
+    crash_batch = [
+        {"source": "train", "partition": 1, "offset": 1, "row_id": "t1-0001", "value": 111},
+    ]
+    p = CTX.Process(
+        target=crashing_sender_child, args=("demo-crash", crash_batch, "published")
+    )
+    p.start(); p.join(60)
+    assert p.exitcode == 42
+    rec = t.batch_record("demo-crash")
+    ok(f"子进程在确认前硬退出（exit 42），但事务已生效: receipt={rec['receipt'][:20]}…")
+    rows_before = len(t.scan())
+    r4 = t.ingest_batch("demo-crash", crash_batch)  # 接入端重发
+    assert r4["receipt"] == rec["receipt"] and r4["replayed"]
+    assert len(t.scan()) == rows_before
+    ok(f"重放返回原 receipt，未新增行（{rows_before} 行）、未推进版本")
+
+    banner("12. 两个接入进程与压实同时工作：互不覆盖")
+    base_version = t.current_version()
+    before = t.scan()
+    n = 5
+    barrier = CTX.Barrier(3)
+    q = CTX.Queue()
+    p1 = CTX.Process(target=ingest_worker_child, args=("srcA", n, barrier, q))
+    p2 = CTX.Process(target=ingest_worker_child, args=("srcB", n, barrier, q))
+    p1.start(); p2.start()
+    small = sorted(t.manifest()["data_files"])
+    plan_id = create_plan(t, selected=small)       # 压实计划先行
+    barrier.wait(60)                                # 三方对齐：摄取并发、压实提交
+    commit_plan(t, plan_id)
+    p1.join(120); p2.join(120)
+    assert p1.exitcode == 0 and p2.exitcode == 0
+    done = sorted(q.get(timeout=30)[1] for _ in range(2))
+    assert done == ["srcA", "srcB"]
+    expected_rows = before.num_rows + 2 * 2 * n
+    assert t.scan().num_rows == expected_rows
+    assert t.ingest_cursors()["srcA"] == {"0": 2 * n}
+    assert t.ingest_cursors()["srcB"] == {"0": 2 * n}
+    assert t.current_version() == base_version + 2 * n + 1
+    ok(f"2 个接入进程各 {n} 批 + 1 次压实全部生效: "
+       f"版本 v{base_version} -> v{t.current_version()}，行数 {expected_rows}")
+    ok(f"游标完整: srcA={t.ingest_cursors()['srcA']} srcB={t.ingest_cursors()['srcB']}")
 
     banner("全部演示通过")
 

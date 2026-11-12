@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import copy
 import os
 import time
 import uuid
@@ -61,6 +62,7 @@ class LakeTable:
             "created_at": time.time(),
             "data_files": {},
             "delete_files": {},
+            "ingest": {"cursors": {}, "batches": {}},
         }
         mf.publish_manifest(t.meta_root, m0)
         return t
@@ -89,13 +91,21 @@ class LakeTable:
 
     @staticmethod
     def _next(cur: dict) -> dict:
-        """以 cur 为父版本构造下一版本的骨架（浅拷贝两份文件字典）。"""
+        """以 cur 为父版本构造下一版本的骨架（文件字典浅拷贝，ingest 深拷贝）。
+
+        ingest 段（接入游标 + 批次索引）必须随每个新版本原样携带，
+        这样追加 / 删除 / 压实 / 摄取任何一条提交路径都不会丢别人的进度。
+        旧格式 manifest 没有该段，按空状态补齐。
+        """
         return {
             "version": cur["version"] + 1,
             "parent": cur["version"],
             "created_at": time.time(),
             "data_files": dict(cur["data_files"]),
             "delete_files": dict(cur["delete_files"]),
+            "ingest": copy.deepcopy(
+                cur.get("ingest") or {"cursors": {}, "batches": {}}
+            ),
         }
 
     # ---------------------------------------------------------------- 追加
@@ -224,6 +234,25 @@ class LakeTable:
                 os.unlink(lpath)
             except FileNotFoundError:
                 pass
+
+    # ------------------------------------------------------------ 微批摄取
+    def ingest_batch(self, batch_key: str, messages) -> dict:
+        """可重放的微批摄取事务，详见 lake/ingest.py。"""
+        from .ingest import ingest_batch
+
+        return ingest_batch(self, batch_key, messages)
+
+    def ingest_cursors(self, version: int | None = None) -> dict:
+        """查询指定版本（默认当前）各来源分片的消费游标。"""
+        from .ingest import ingest_cursors
+
+        return ingest_cursors(self, version)
+
+    def batch_record(self, batch_key: str) -> dict | None:
+        """查询已提交批次的记录；未提交返回 None。"""
+        from .ingest import batch_record
+
+        return batch_record(self, batch_key)
 
     # ------------------------------------------------------------ 内部工具
     def _all_deleted_positions(self, manifest: dict) -> dict[str, set[int]]:

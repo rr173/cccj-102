@@ -1,0 +1,42 @@
+{
+  "batch_key": "demo-batch-2",
+  "created_at": 1794472185.9844255,
+  "cursors_after": {
+    "eval": {
+      "0": 2
+    },
+    "train": {
+      "0": 3
+    }
+  },
+  "cursors_before": {
+    "eval": {
+      "0": 1
+    },
+    "train": {
+      "0": 2,
+      "1": 1
+    }
+  },
+  "data_file_id": "6562c2068ea540a6a507c8f0fa20f809",
+  "digest": "35a85bd33bcc8af3d368978b26427532223b40434a1b88f865f81c4ac4291958",
+  "messages": [
+    [
+      "eval",
+      "0",
+      1,
+      "e0-0001",
+      201
+    ],
+    [
+      "train",
+      "0",
+      2,
+      "t0-0002",
+      102
+    ]
+  ],
+  "num_rows": 2,
+  "receipt": "rcpt-e8243b8cdd70f5e9ac19120710447e0b",
+  "version": 17
+}

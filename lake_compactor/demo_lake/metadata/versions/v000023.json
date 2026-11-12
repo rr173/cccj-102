@@ -1,0 +1,138 @@
+{
+  "created_at": 1794472186.0828977,
+  "data_files": {
+    "11a9e98b91e24152a9c189b6bfae366d": {
+      "num_rows": 2,
+      "path": "data/data-11a9e98b91e24152a9c189b6bfae366d.parquet"
+    },
+    "3232d2fd3ed041c78077ef539ba1bf55": {
+      "num_rows": 2,
+      "path": "data/data-3232d2fd3ed041c78077ef539ba1bf55.parquet"
+    },
+    "9b9b6b5bf138443b81f94e0b352a919b": {
+      "num_rows": 31,
+      "path": "data/data-9b9b6b5bf138443b81f94e0b352a919b.parquet"
+    },
+    "c5ea82b823c7421986de88d5299e2813": {
+      "num_rows": 2,
+      "path": "data/data-c5ea82b823c7421986de88d5299e2813.parquet"
+    },
+    "d93f26f3e25f4f51a9695b033c1565e8": {
+      "num_rows": 2,
+      "path": "data/data-d93f26f3e25f4f51a9695b033c1565e8.parquet"
+    }
+  },
+  "delete_files": {},
+  "ingest": {
+    "batches": {
+      "demo-batch-1": {
+        "cursors_after": {
+          "eval": {
+            "0": 1
+          },
+          "train": {
+            "0": 2,
+            "1": 1
+          }
+        },
+        "digest": "0793c8a043410fd1f73a19a4a8be396cfcb718c87d9024ca485a05598dc1f389",
+        "num_rows": 4,
+        "receipt": "rcpt-0c02735070d993209393b1bbe0f65e6a",
+        "record": "metadata/ingest/batches/batch-a6832aa23e2be1b69cae62302c2f903d.json",
+        "version": 16
+      },
+      "demo-batch-2": {
+        "cursors_after": {
+          "eval": {
+            "0": 2
+          },
+          "train": {
+            "0": 3
+          }
+        },
+        "digest": "35a85bd33bcc8af3d368978b26427532223b40434a1b88f865f81c4ac4291958",
+        "num_rows": 2,
+        "receipt": "rcpt-e8243b8cdd70f5e9ac19120710447e0b",
+        "record": "metadata/ingest/batches/batch-c16b5d6f71afe46088e39f765740feca.json",
+        "version": 17
+      },
+      "demo-crash": {
+        "cursors_after": {
+          "train": {
+            "1": 2
+          }
+        },
+        "digest": "964e2f2452f8d1eb9c42b6afc36b0bf304f1e9e7fd14a8057caa7ccbc0fd62cf",
+        "num_rows": 1,
+        "receipt": "rcpt-62ce54ff04857c7ad82addc74b7bf8b3",
+        "record": "metadata/ingest/batches/batch-600a25414f30f35786fe32b722d52cad.json",
+        "version": 18
+      },
+      "srcA-0": {
+        "cursors_after": {
+          "srcA": {
+            "0": 2
+          }
+        },
+        "digest": "2c97bfef30296e7de6fc83360cc5799d1cf8a5615ded7c934fef39780150cfc0",
+        "num_rows": 2,
+        "receipt": "rcpt-cec7cc57500c80cf525bfdb111479761",
+        "record": "metadata/ingest/batches/batch-b27ba7e59b18cd622374d21e95ab2d81.json",
+        "version": 21
+      },
+      "srcA-1": {
+        "cursors_after": {
+          "srcA": {
+            "0": 4
+          }
+        },
+        "digest": "09ae159ff1ed907a2646ecbda5992001326207f5f0b054ad11a0541e12193e97",
+        "num_rows": 2,
+        "receipt": "rcpt-571cb68175a57f4dfb55a06098392590",
+        "record": "metadata/ingest/batches/batch-02520d10ac18047523d7abb12fa57db9.json",
+        "version": 23
+      },
+      "srcB-0": {
+        "cursors_after": {
+          "srcB": {
+            "0": 2
+          }
+        },
+        "digest": "20c70e6ed4644eed6391fe3120bd8c126b7287fc2bffc493596b2f682807fe48",
+        "num_rows": 2,
+        "receipt": "rcpt-b728965cadcb915800023c22f6d21f3b",
+        "record": "metadata/ingest/batches/batch-8e4f0df8b177deecf6d5bf3f180afe4a.json",
+        "version": 20
+      },
+      "srcB-1": {
+        "cursors_after": {
+          "srcB": {
+            "0": 4
+          }
+        },
+        "digest": "426be848aedaa9acbaaee67b8872c24a1b85f44bb34f065738ccb35c75b6cb42",
+        "num_rows": 2,
+        "receipt": "rcpt-67b534b2a80112e0623fd73175b6412c",
+        "record": "metadata/ingest/batches/batch-a15240e7a6a685df3e41ba16713f102c.json",
+        "version": 22
+      }
+    },
+    "cursors": {
+      "eval": {
+        "0": 2
+      },
+      "srcA": {
+        "0": 4
+      },
+      "srcB": {
+        "0": 4
+      },
+      "train": {
+        "0": 3,
+        "1": 2
+      }
+    }
+  },
+  "parent": 22,
+  "version": 23
+}

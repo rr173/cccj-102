@@ -1,0 +1,24 @@
+{
+  "created_at": 1794472185.585934,
+  "data_files": {
+    "6a3941562bb2467da088b2883d8f70fa": {
+      "num_rows": 0,
+      "path": "data/data-6a3941562bb2467da088b2883d8f70fa.parquet"
+    },
+    "8076db7602fb453d81581421c602df52": {
+      "num_rows": 8,
+      "path": "data/data-8076db7602fb453d81581421c602df52.parquet"
+    },
+    "a240feb096334cd1830c0140401e4343": {
+      "num_rows": 6,
+      "path": "data/data-a240feb096334cd1830c0140401e4343.parquet"
+    }
+  },
+  "delete_files": {},
+  "ingest": {
+    "batches": {},
+    "cursors": {}
+  },
+  "parent": 2,
+  "version": 3
+}

@@ -3,9 +3,13 @@
 受保护版本 = 当前 HEAD 版本 ∪ 所有存活读者租约指向的版本。
 只有这些版本引用的数据/删除文件允许保留；其余一律删除。
 staging 下超过 max_age 的候选目录（崩溃残留、失败计划）一并清除。
+摄取批次记录只保留当前 manifest 批次索引引用的；孤儿记录（提交中途
+崩溃的残留）删除。data/ 下的 .tmp 临时文件按 max_age 年龄保护，避免
+误删其他写者在途的写入。
 
-GC 与租约创建、版本提交共用同一把 flock，因此“读租约集合”
-与“删文件”之间不会插入新的租约或新的版本。
+GC 与租约创建、版本提交（含摄取提交）共用同一把 flock，因此“读租约
+集合”与“删文件”之间不会插入新的租约或新的版本；摄取的批次记录
+写入与 manifest 发布在同一临界区内，GC 不会误删即将被引用的记录。
 """
 
 from __future__ import annotations
@@ -50,8 +54,14 @@ def collect(
         removed_files = []
         for name in sorted(os.listdir(table.data_dir)):
             rel = f"data/{name}"
-            if name.startswith(".tmp-") or rel not in protected_paths:
-                os.unlink(os.path.join(table.data_dir, name))
+            abspath = os.path.join(table.data_dir, name)
+            if name.startswith(".tmp-"):
+                # 在途写入的临时文件按年龄保护，只清理确定是残骸的
+                if now - os.path.getmtime(abspath) >= staging_max_age_seconds:
+                    os.unlink(abspath)
+                    removed_files.append(rel)
+            elif rel not in protected_paths:
+                os.unlink(abspath)
                 removed_files.append(rel)
 
         removed_staging = []
@@ -63,10 +73,31 @@ def collect(
                 shutil.rmtree(d, ignore_errors=True)
                 removed_staging.append(name)
 
+        # 摄取批次记录：批次索引只增不减地随 manifest 携带，当前 manifest
+        # 未引用的记录只可能是提交中途崩溃的孤儿（记录写入与 HEAD 翻转在
+        # 同一把锁内，GC 不会与在途提交交错）。
+        from .ingest import INGEST_REL_DIR, ingest_state
+
+        referenced_records = {
+            b["record"]
+            for b in ingest_state(mf.load_manifest(table.meta_root, cur_v))[
+                "batches"
+            ].values()
+        }
+        removed_ingest_records = []
+        batches_dir = os.path.join(table.root, INGEST_REL_DIR)
+        if os.path.isdir(batches_dir):
+            for name in sorted(os.listdir(batches_dir)):
+                rel = os.path.join(INGEST_REL_DIR, name)
+                if rel not in referenced_records:
+                    os.unlink(os.path.join(batches_dir, name))
+                    removed_ingest_records.append(rel)
+
         return {
             "current_version": cur_v,
             "protected_versions": sorted(protected_versions),
             "active_leases": leases,
             "removed_files": removed_files,
             "removed_staging": removed_staging,
+            "removed_ingest_records": removed_ingest_records,
         }

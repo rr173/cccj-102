@@ -1,0 +1,87 @@
+{
+  "created_at": 1794472186.063742,
+  "data_files": {
+    "9b9b6b5bf138443b81f94e0b352a919b": {
+      "num_rows": 31,
+      "path": "data/data-9b9b6b5bf138443b81f94e0b352a919b.parquet"
+    },
+    "d93f26f3e25f4f51a9695b033c1565e8": {
+      "num_rows": 2,
+      "path": "data/data-d93f26f3e25f4f51a9695b033c1565e8.parquet"
+    }
+  },
+  "delete_files": {},
+  "ingest": {
+    "batches": {
+      "demo-batch-1": {
+        "cursors_after": {
+          "eval": {
+            "0": 1
+          },
+          "train": {
+            "0": 2,
+            "1": 1
+          }
+        },
+        "digest": "0793c8a043410fd1f73a19a4a8be396cfcb718c87d9024ca485a05598dc1f389",
+        "num_rows": 4,
+        "receipt": "rcpt-0c02735070d993209393b1bbe0f65e6a",
+        "record": "metadata/ingest/batches/batch-a6832aa23e2be1b69cae62302c2f903d.json",
+        "version": 16
+      },
+      "demo-batch-2": {
+        "cursors_after": {
+          "eval": {
+            "0": 2
+          },
+          "train": {
+            "0": 3
+          }
+        },
+        "digest": "35a85bd33bcc8af3d368978b26427532223b40434a1b88f865f81c4ac4291958",
+        "num_rows": 2,
+        "receipt": "rcpt-e8243b8cdd70f5e9ac19120710447e0b",
+        "record": "metadata/ingest/batches/batch-c16b5d6f71afe46088e39f765740feca.json",
+        "version": 17
+      },
+      "demo-crash": {
+        "cursors_after": {
+          "train": {
+            "1": 2
+          }
+        },
+        "digest": "964e2f2452f8d1eb9c42b6afc36b0bf304f1e9e7fd14a8057caa7ccbc0fd62cf",
+        "num_rows": 1,
+        "receipt": "rcpt-62ce54ff04857c7ad82addc74b7bf8b3",
+        "record": "metadata/ingest/batches/batch-600a25414f30f35786fe32b722d52cad.json",
+        "version": 18
+      },
+      "srcB-0": {
+        "cursors_after": {
+          "srcB": {
+            "0": 2
+          }
+        },
+        "digest": "20c70e6ed4644eed6391fe3120bd8c126b7287fc2bffc493596b2f682807fe48",
+        "num_rows": 2,
+        "receipt": "rcpt-b728965cadcb915800023c22f6d21f3b",
+        "record": "metadata/ingest/batches/batch-8e4f0df8b177deecf6d5bf3f180afe4a.json",
+        "version": 20
+      }
+    },
+    "cursors": {
+      "eval": {
+        "0": 2
+      },
+      "srcB": {
+        "0": 2
+      },
+      "train": {
+        "0": 3,
+        "1": 2
+      }
+    }
+  },
+  "parent": 19,
+  "version": 20
+}

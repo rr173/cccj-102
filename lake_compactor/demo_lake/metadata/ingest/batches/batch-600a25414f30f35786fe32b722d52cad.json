@@ -1,0 +1,32 @@
+{
+  "batch_key": "demo-crash",
+  "created_at": 1794472185.9940135,
+  "cursors_after": {
+    "train": {
+      "1": 2
+    }
+  },
+  "cursors_before": {
+    "eval": {
+      "0": 2
+    },
+    "train": {
+      "0": 3,
+      "1": 1
+    }
+  },
+  "data_file_id": "0232fd176a4340c5b8e68ba445de3a7e",
+  "digest": "964e2f2452f8d1eb9c42b6afc36b0bf304f1e9e7fd14a8057caa7ccbc0fd62cf",
+  "messages": [
+    [
+      "train",
+      "1",
+      1,
+      "t1-0001",
+      111
+    ]
+  ],
+  "num_rows": 1,
+  "receipt": "rcpt-62ce54ff04857c7ad82addc74b7bf8b3",
+  "version": 18
+}

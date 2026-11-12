@@ -1,0 +1,45 @@
+{
+  "batch_key": "srcB-2",
+  "created_at": 1794472186.0878139,
+  "cursors_after": {
+    "srcB": {
+      "0": 6
+    }
+  },
+  "cursors_before": {
+    "eval": {
+      "0": 2
+    },
+    "srcA": {
+      "0": 4
+    },
+    "srcB": {
+      "0": 4
+    },
+    "train": {
+      "0": 3,
+      "1": 2
+    }
+  },
+  "data_file_id": "b58de275152b476d8054a3c68de16f19",
+  "digest": "96c61a65aa0e94c70042323e3c5a859c5c8ab0899cf773b3034eea2c4034901d",
+  "messages": [
+    [
+      "srcB",
+      "0",
+      4,
+      "srcB-0004",
+      4
+    ],
+    [
+      "srcB",
+      "0",
+      5,
+      "srcB-0005",
+      5
+    ]
+  ],
+  "num_rows": 2,
+  "receipt": "rcpt-5d5b4cda8cc0f3ca43007fb66b8e181a",
+  "version": 24
+}
