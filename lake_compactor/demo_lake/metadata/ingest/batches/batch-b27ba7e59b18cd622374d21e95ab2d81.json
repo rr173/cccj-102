@@ -1,6 +1,6 @@
 {
   "batch_key": "srcA-0",
-  "created_at": 1794485490.3824358,
+  "created_at": 1794500554.9405875,
   "cursors_after": {
     "srcA": {
       "0": 2
@@ -10,15 +10,12 @@
     "eval": {
       "0": 2
     },
-    "srcB": {
-      "0": 2
-    },
     "train": {
       "0": 3,
       "1": 2
     }
   },
-  "data_file_id": "7cf9f7f974354748a80645d10e3aae1e",
+  "data_file_id": "c49da5a376054eefae850392c397843c",
   "digest": "2c97bfef30296e7de6fc83360cc5799d1cf8a5615ded7c934fef39780150cfc0",
   "messages": [
     [
@@ -38,5 +35,5 @@
   ],
   "num_rows": 2,
   "receipt": "rcpt-cec7cc57500c80cf525bfdb111479761",
-  "version": 21
+  "version": 20
 }

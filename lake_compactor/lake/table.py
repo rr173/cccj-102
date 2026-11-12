@@ -206,16 +206,38 @@ class LakeTable:
 
     # ---------------------------------------------------------------- 租约
     @contextmanager
-    def lease(self, version: int | None = None):
+    def lease(self, version: int | None = None, require_files: bool = False):
         """读者租约：保护指定版本（默认当前版本）引用的全部文件不被 GC。
 
         租约的创建与 GC 都在同一把提交锁下执行，因此 GC 不会漏看
         一个刚刚创建好的租约；持租约期间可安全扫描旧版本。
+
+        版本 manifest 也在同一临界区内读取并随租约一起产出
+        （``lease.manifest``）：这样“定位版本 -> 建立保护”之间没有窗口，
+        GC 不可能在两者之间删掉该版本引用的文件。
+
+        ``require_files=True`` 时还会在同一临界区内确认该版本引用的数据/
+        删除文件都在磁盘上：如果 GC 在租约建立之前已经回收了某个历史版本
+        的文件，这里会以 LeaseError 明确拒绝，而不是让读取在途中失败。
         """
         with self.lock():
             v = self.current_version() if version is None else version
             if not os.path.exists(mf.version_path(self.meta_root, v)):
                 raise LeaseError(f"version {v} no longer exists")
+            m = mf.load_manifest(self.meta_root, v)
+            if require_files:
+                missing = [
+                    meta["path"]
+                    for group in ("data_files", "delete_files")
+                    for meta in m[group].values()
+                    if not os.path.exists(os.path.join(self.root, meta["path"]))
+                ]
+                if missing:
+                    raise LeaseError(
+                        f"version {v} files have been collected: "
+                        f"{missing[:3]}"
+                        + (" ..." if len(missing) > 3 else "")
+                    )
             lid = uuid.uuid4().hex
             lpath = os.path.join(self.leases_dir, f"lease-{lid}.json")
             storage.atomic_write_json(
@@ -228,7 +250,7 @@ class LakeTable:
                 },
             )
         try:
-            yield SimpleNamespace(lease_id=lid, version=v)
+            yield SimpleNamespace(lease_id=lid, version=v, manifest=m)
         finally:
             try:
                 os.unlink(lpath)

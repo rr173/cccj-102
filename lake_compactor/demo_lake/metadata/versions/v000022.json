@@ -1,21 +1,21 @@
 {
-  "created_at": 1794485490.3885744,
+  "created_at": 1794500554.9487276,
   "data_files": {
-    "36d820b302004747b377999f63860136": {
+    "3db92a30e891403988cd8afcac61e776": {
       "num_rows": 31,
-      "path": "data/data-36d820b302004747b377999f63860136.parquet"
+      "path": "data/data-3db92a30e891403988cd8afcac61e776.parquet"
     },
-    "66e62ac2a04e4594977dc09b25cf546c": {
+    "42572cafd65e444a929682c91a46995a": {
       "num_rows": 2,
-      "path": "data/data-66e62ac2a04e4594977dc09b25cf546c.parquet"
+      "path": "data/data-42572cafd65e444a929682c91a46995a.parquet"
     },
-    "7a681c34a73c4babbb800a3a0c7d0852": {
+    "66ce69b822fa40009b33f5f62ef62d4d": {
       "num_rows": 2,
-      "path": "data/data-7a681c34a73c4babbb800a3a0c7d0852.parquet"
+      "path": "data/data-66ce69b822fa40009b33f5f62ef62d4d.parquet"
     },
-    "7cf9f7f974354748a80645d10e3aae1e": {
+    "c49da5a376054eefae850392c397843c": {
       "num_rows": 2,
-      "path": "data/data-7cf9f7f974354748a80645d10e3aae1e.parquet"
+      "path": "data/data-c49da5a376054eefae850392c397843c.parquet"
     }
   },
   "delete_files": {},
@@ -74,7 +74,19 @@
         "num_rows": 2,
         "receipt": "rcpt-cec7cc57500c80cf525bfdb111479761",
         "record": "metadata/ingest/batches/batch-b27ba7e59b18cd622374d21e95ab2d81.json",
-        "version": 21
+        "version": 20
+      },
+      "srcA-1": {
+        "cursors_after": {
+          "srcA": {
+            "0": 4
+          }
+        },
+        "digest": "09ae159ff1ed907a2646ecbda5992001326207f5f0b054ad11a0541e12193e97",
+        "num_rows": 2,
+        "receipt": "rcpt-571cb68175a57f4dfb55a06098392590",
+        "record": "metadata/ingest/batches/batch-02520d10ac18047523d7abb12fa57db9.json",
+        "version": 22
       },
       "srcB-0": {
         "cursors_after": {
@@ -86,19 +98,7 @@
         "num_rows": 2,
         "receipt": "rcpt-b728965cadcb915800023c22f6d21f3b",
         "record": "metadata/ingest/batches/batch-8e4f0df8b177deecf6d5bf3f180afe4a.json",
-        "version": 20
-      },
-      "srcB-1": {
-        "cursors_after": {
-          "srcB": {
-            "0": 4
-          }
-        },
-        "digest": "426be848aedaa9acbaaee67b8872c24a1b85f44bb34f065738ccb35c75b6cb42",
-        "num_rows": 2,
-        "receipt": "rcpt-67b534b2a80112e0623fd73175b6412c",
-        "record": "metadata/ingest/batches/batch-a15240e7a6a685df3e41ba16713f102c.json",
-        "version": 22
+        "version": 21
       }
     },
     "cursors": {
@@ -106,10 +106,10 @@
         "0": 2
       },
       "srcA": {
-        "0": 2
+        "0": 4
       },
       "srcB": {
-        "0": 4
+        "0": 2
       },
       "train": {
         "0": 3,

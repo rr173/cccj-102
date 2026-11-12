@@ -166,7 +166,7 @@ HEAD 一次翻转生效：**这就是唯一可见性边界**，不存在“先�
 ## 9. 运行
 
 ```bash
-./run.sh        # 自动化校验（pytest）+ 叙述式演示（demo.py）
+./run.sh        # 自动化校验（pytest）+ 叙述式演示（demo*.py）
 ```
 
 测试实际读写 Parquet、实际 fork 子进程，用同步屏障精确安排
@@ -252,3 +252,45 @@ HEAD 一次翻转生效：**这就是唯一可见性边界**，不存在“先�
   是同一份逻辑，用于发布前与“相同参数复用”时的完好性核对。
 - **与源数据解耦**：交付目录不在 GC 扫描范围内，子集文件自包含；源数据
   被压实替换或被 GC 回收后，子集仍可直接读取与校验。
+
+## 12. DuckDB 查询工作台（lake/workbench/）
+
+```
+<进程内，不落盘>
+  LogicalBinding  逻辑名称 -> (本机湖表目录, 精确 manifest 版本号)
+  ResolvedSource  已定位到版本的来源（table + manifest，尚未读数据行）
+  QueryResult     Arrow 表 + 每个来源的实际版本 + 耗时
+```
+
+- **数据边界**：SQL 里只能出现登记过的逻辑名称，底层 Parquet 路径不进入
+  SQL。每个名称装载 `LakeTable.scan` 同语义的可见行（固定 manifest →
+  归组位置删除 → 按物理行号过滤），但按批次流式产出并以 Arrow C 流注册
+  给 DuckDB（每次扫描重新构造流，支持自连接/子查询重复扫描）。
+- **版本固定**：一次请求的所有绑定在读取前调用 `resolve_sources`，逐个
+  读 `versions/vNNNNNN.json` 校验版本存在；任何失败整次拒绝，不打开
+  DuckDB 会话。
+- **读者保护**：每个来源在读取前持 `table.lease(version, require_files=True)`；
+  `lease` 在同一临界区内读 `HEAD` 与 manifest、确认版本引用的文件仍在、
+  写入租约文件，因此“定位版本 → 建立保护”之间没有窗口。租约一直持有到
+  结果 Arrow 表组装完成、会话关闭之后。另一个进程的追加/压实/`collect()`
+  因此在取数途中无法删除本次输入；若历史版本在租约之前已被回收，请求
+  以 `VersionError` 明确拒绝。
+- **只读边界（两层）**：
+  1. 工作台侧：`duckdb.extract_statements` 只允许 SELECT 类语句（SELECT /
+     WITH / FROM-first / VALUES / DESCRIBE / SUMMARIZE）；写语句与
+     CALL/LOAD/INSTALL/SET/PRAGMA/COPY/ATTACH 等立即拒绝。执行前再用
+     `EXPLAIN (FORMAT JSON)` 遍历物理计划，拒绝 `DUCKDB_*` 目录/函数表
+     节点与任何文件/外部数据源扫描节点（`READ_PARQUET`、`READ_CSV`、
+     `GLOB` 等）。
+  2. DuckDB 侧：`enable_external_access=false` +
+     `autoload/autoinstall_known_extensions=false` +
+     `lock_configuration=true`，从引擎层关闭文件系统、扩展加载与网络；
+     查询无法用 SET/PRAGMA 重新打开。
+- **清理**：成功返回、语法错误、版本定位失败、查询执行失败都走同一
+  finally：关闭 DuckDB 会话、按栈顺序释放全部租约；拒绝路径不写湖表
+  文件/版本/清单。
+- **结果上限**：按批次拉取结果并累计行数，超过 `max_rows` 立即拒绝整次
+  查询；空结果从 reader.schema 构造 0 行 Arrow 表，列名/类型不丢。
+- **错误分类**：`WorkbenchError.kind` ∈ mapping / version / syntax /
+  permission / query，分别对应登记表、版本定位、查询文本、权限边界、
+  绑定与执行。

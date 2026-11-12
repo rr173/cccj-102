@@ -9,8 +9,6 @@ Python + PyArrow + DuckDB，元数据用本机文件与 flock 实现，单机多
 - 压实提交时比对版本：保留并发追加、翻译新到删除、重叠选文件则冲突失败
 - 微批摄取事务：源端消费游标、请求摘要、receipt 与本批数据在同一个
   manifest 版本里原子生效，确认超时重发不会重复入仓
-- 微批摄取事务：源端消费游标、请求摘要、receipt 与本批数据在同一个
-  manifest 版本里原子生效，确认超时重发不会重复入仓
 - 读者租约保护旧版本，GC 不清租约引用的文件
 - **数据质量画像**：按修订号冻结完整质量报告（样本量/空字段/重复标识/
   数值极值合计/左闭右开分段计数/规则逐条判定），报告只读、自包含，
@@ -18,20 +16,63 @@ Python + PyArrow + DuckDB，元数据用本机文件与 flock 实现，单机多
 - **按对象成组抽样**：以 `row_id` 为抽样单位产出 train/validation/test
   三个 Parquet 子集，同一对象的多条观测必然同属一个子集；分配只依赖
   seed 与 row_id，与文件排列、压实无关（见 [SPLIT.md](SPLIT.md)）
+- **DuckDB 查询工作台**：一次请求登记若干逻辑名称（各自绑定本机湖表目录
+  与精确版本号），提交只读 SELECT（含 CTE/连接/过滤/分组/排序），直接拿
+  Arrow 表或终端 CSV / JSON Lines；取数期间持读者租约，写语句、直接读
+  文件、外部数据源与联网一律拒绝（见 [WORKBENCH.md](WORKBENCH.md)）
 
 ## 运行
 
 ```bash
-./run.sh                 # 自动化校验 + 压实/摄取/质量画像/切分演示
+./run.sh                 # 自动化校验 + 压实/摄取/质量画像/切分/查询工作台演示
 # 或分别运行：
-python3 -m pytest -v     # 76 个端到端用例（真实读写 Parquet、真实多进程交错）
+python3 -m pytest -v     # 95 个端到端用例（真实读写 Parquet、真实多进程交错）
 python3 demo.py          # 叙述式演示 12 个场景
 python3 demo_quality.py  # 质量画像 10 个验收场景（本地样本、可手算核对）
 python3 demo_split.py    # 成组抽样切分 11 个验收场景
+python3 demo_workbench.py  # 查询工作台 5 组验收场景
 python3 check_split.py <交付目录> --verify-assignment   # 独立分组校验脚本
 ```
 
 依赖：`pyarrow`、`duckdb`、`pytest`（可用 `PYTHON=/path/to/python` 指定解释器）。
+
+## 查询工作台（workbench）
+
+特征湖表与标签湖表按样本键对齐时，不用分别导出再由临时脚本合并：
+
+```python
+from lake.workbench import query_arrow
+
+result = query_arrow(
+    {
+        "features":   ("./lake_feature", 12),
+        "labels_old": ("./lake_label", 9),    # 同一个物理湖表
+        "labels_new": ("./lake_label", 12),   # 两个不同历史版本
+    },
+    """
+    SELECT f.row_id, f.value,
+           old.value AS label_before,
+           new.value AS label_after
+    FROM features f
+    LEFT JOIN labels_old old ON old.row_id = f.row_id
+    LEFT JOIN labels_new new ON new.row_id = f.row_id
+    ORDER BY f.row_id
+    """,
+)
+result       # pyarrow.Table
+```
+
+- 每个逻辑名称装载它登记的**精确**版本经位置删除过滤后的可见行；底层
+  Parquet 路径不进入 SQL。同一物理表可登记成多个名称绑定不同版本。
+- 一次请求的全部输入版本在执行前确定；取数与组装结果期间每个来源都持
+  `table.lease(version)`，另一进程追加/压实/GC 不会改变本次结果。
+- 只读：写语句、DuckDB 直接读本地路径、加载外部数据源、联网、目录函数
+  一律拒绝；拒绝时不动湖表文件/版本/清单，也不留数据库会话与租约。
+- 错误分类：`mapping` / `version` / `syntax` / `permission` / `query`。
+- 空结果保留列名与类型；CSV 保留表头，JSON Lines 为空。
+
+CLI：`python3 -m lake.workbench.cli query --source NAME=DIR:VERSION ...`；
+详见 [WORKBENCH.md](WORKBENCH.md) 与 `examples/workbench.example.json`。
 
 ## 数据质量画像（quality profile）
 
@@ -146,14 +187,20 @@ result = table.ingest_batch(batch_key, messages)
 | `lake/quality/cli.py` | 质量画像命令行入口（create/show/list/compare/reference） |
 | `lake/splits/split.py` | 按 row_id 成组抽样：稳定散列分配、固定 snapshot 流式读取、暂存目录 + 一次改名发布、身份复用 |
 | `lake/splits/cli.py` | 切分命令行入口（create/check/list） |
+| `lake/workbench/registry.py` | 逻辑名称登记表：名称 -> (湖表目录, 精确版本)，读取前统一定位 manifest |
+| `lake/workbench/engine.py` | DuckDB 查询工作台：只读语句校验、计划边界检查、可见行流式装载、读者租约、结果组装 |
+| `lake/workbench/cli.py` | 查询工作台命令行入口（query/spec，CSV / JSON Lines / Arrow） |
 | `check_split.py` | 独立分组校验脚本（只读交付目录，可复算归属） |
 | `tests/test_engine.py` | 压实引擎校验（屏障交错、冲突、崩溃、租约、原子发布压力） |
 | `tests/test_ingest.py` | 摄取事务校验（多分片、重发、争抢、并发、崩溃恢复、旧表兼容） |
 | `tests/test_quality.py` | 质量画像验收（手算样本、整理一致、删行、违规、错配、复用、租约、崩溃、GC 后可用） |
 | `tests/test_split.py` | 切分验收（成组不重不漏、文件排列/压实不变、snapshot 推进、空标识、坏权重、身份复用、发布边界崩溃、GC 后读取） |
+| `tests/test_workbench.py` | 查询工作台验收（独立期望行集、连接/分组、双版本对照、取数途中追加+压实+GC 的读者保护、空结果 schema、逐项拒绝与湖表不变） |
 | `demo.py` | 叙述式端到端演示 |
 | `demo_quality.py` | 质量画像叙述式演示（10 个验收场景） |
 | `demo_split.py` | 成组抽样切分叙述式演示（11 个验收场景） |
+| `demo_workbench.py` | 查询工作台叙述式演示（5 组验收场景） |
 | `QUALITY.md` | 画像规则配置、报告字段、接口与存储语义说明 |
 | `SPLIT.md` | 成组抽样切分的参数、算法、清单字段与交付语义 |
+| `WORKBENCH.md` | 查询工作台的登记表、查询语法、读者保护、安全边界与 CLI 说明 |
 | `ARCHITECTURE.md` | 架构说明 |

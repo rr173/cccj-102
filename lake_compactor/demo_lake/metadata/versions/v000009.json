@@ -1,16 +1,16 @@
 {
-  "created_at": 1794485490.0996652,
+  "created_at": 1794500554.700154,
   "data_files": {
-    "4400ac9b3b3946f19f557a959d3ab0d5": {
+    "84ad33cd6f9d4862b71fc51f1e57c3a4": {
       "num_rows": 11,
-      "path": "data/data-4400ac9b3b3946f19f557a959d3ab0d5.parquet"
+      "path": "data/data-84ad33cd6f9d4862b71fc51f1e57c3a4.parquet"
     }
   },
   "delete_files": {
-    "a4e4d0fe3e5d4477a2b353351d9a5696": {
+    "abb83eef21a74bf59b56aa2bbe50b998": {
       "num_deletes": 1,
-      "path": "data/deletes-a4e4d0fe3e5d4477a2b353351d9a5696.parquet",
-      "target": "4400ac9b3b3946f19f557a959d3ab0d5"
+      "path": "data/deletes-abb83eef21a74bf59b56aa2bbe50b998.parquet",
+      "target": "84ad33cd6f9d4862b71fc51f1e57c3a4"
     }
   },
   "ingest": {

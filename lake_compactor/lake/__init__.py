@@ -7,8 +7,15 @@ from .errors import (
     IdempotencyConflictError,
     LakeError,
     LeaseError,
+    MappingError,
+    PermissionBoundaryError,
+    QueryExecutionError,
+    QueryReferenceError,
+    QuerySyntaxError,
     SplitConflictError,
     SplitError,
+    VersionError,
+    WorkbenchError,
 )
 from .gc import collect
 from .ingest import (
@@ -31,6 +38,13 @@ from .splits import (
 )
 from .table import DATA_SCHEMA, DELETE_SCHEMA, LakeTable
 from . import verify
+from .workbench import (
+    DuckDBWorkbench,
+    QueryResult,
+    query,
+    query_arrow,
+    validate_statement,
+)
 
 __all__ = [
     "LakeTable",
@@ -55,6 +69,11 @@ __all__ = [
     "SUBSETS",
     "TOTAL_WEIGHT",
     "ALGORITHM_VERSION",
+    "DuckDBWorkbench",
+    "QueryResult",
+    "query",
+    "query_arrow",
+    "validate_statement",
     "LakeError",
     "ConflictError",
     "LeaseError",
@@ -62,4 +81,11 @@ __all__ = [
     "IdempotencyConflictError",
     "SplitError",
     "SplitConflictError",
+    "WorkbenchError",
+    "MappingError",
+    "VersionError",
+    "QuerySyntaxError",
+    "QueryReferenceError",
+    "QueryExecutionError",
+    "PermissionBoundaryError",
 ]

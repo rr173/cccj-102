@@ -1,0 +1,8 @@
+{
+  "sources": {
+    "features": {"lake": "./lake_feature", "version": 12},
+    "labels_rev9": {"lake": "./lake_label", "version": 9},
+    "labels_rev12": {"lake": "./lake_label", "version": 12}
+  },
+  "sql": "SELECT f.row_id,\n       f.value        AS feature_value,\n       old.value      AS label_before,\n       new.value      AS label_after\nFROM features f\nLEFT JOIN labels_rev9  old ON old.row_id = f.row_id\nLEFT JOIN labels_rev12 new ON new.row_id = f.row_id\nORDER BY f.row_id, f.value;\n"
+}
