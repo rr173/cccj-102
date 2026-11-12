@@ -1,20 +1,20 @@
 {
-  "created_at": 1794476710.8703227,
+  "created_at": 1794485490.1629827,
   "data_files": {
-    "132eb54a94f24a3fa95114ba1bc912b4": {
+    "4400ac9b3b3946f19f557a959d3ab0d5": {
       "num_rows": 11,
-      "path": "data/data-132eb54a94f24a3fa95114ba1bc912b4.parquet"
+      "path": "data/data-4400ac9b3b3946f19f557a959d3ab0d5.parquet"
     },
-    "b93997d1f043405ab572444f1bc4ef63": {
+    "7a07c4be82604c4fa9dab1e95aa61b22": {
       "num_rows": 4,
-      "path": "data/data-b93997d1f043405ab572444f1bc4ef63.parquet"
+      "path": "data/data-7a07c4be82604c4fa9dab1e95aa61b22.parquet"
     }
   },
   "delete_files": {
-    "db031258439b4dde80576adfe655bf48": {
+    "a4e4d0fe3e5d4477a2b353351d9a5696": {
       "num_deletes": 1,
-      "path": "data/deletes-db031258439b4dde80576adfe655bf48.parquet",
-      "target": "132eb54a94f24a3fa95114ba1bc912b4"
+      "path": "data/deletes-a4e4d0fe3e5d4477a2b353351d9a5696.parquet",
+      "target": "4400ac9b3b3946f19f557a959d3ab0d5"
     }
   },
   "ingest": {

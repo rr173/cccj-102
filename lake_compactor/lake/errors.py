@@ -52,3 +52,15 @@ class RuleSpecError(LakeError):
 
 class ProfileNotFoundError(LakeError):
     """指定（修订号, 规则摘要）身份的质量画像不存在。"""
+
+
+class SplitError(LakeError):
+    """分组抽样切分无法产出（整次拒绝，不留下任何交付物）。
+
+    典型原因：输入可见行存在空 row_id（无法用于对象分组）、权重非法
+    （负数、非整数、总和不是 10000）、目标快照不存在等。
+    """
+
+
+class SplitConflictError(LakeError):
+    """目标交付目录已存在但身份不同，不能替换旧数据。"""

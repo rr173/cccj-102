@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 一键运行：自动化校验（pytest）+ 叙述式演示（demo.py / demo_quality.py）
+# 一键运行：自动化校验（pytest）+ 叙述式演示（demo.py / demo_quality.py / demo_split.py）
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -16,12 +16,15 @@ else
 fi
 
 echo "==> 使用解释器: $PY"
-echo "==> [1/4] 自动化校验（pytest，真实读写 Parquet、真实多进程交错、定点崩溃恢复）"
+echo "==> [1/5] 自动化校验（pytest，真实读写 Parquet、真实多进程交错、定点崩溃恢复）"
 "$PY" -m pytest -v
-echo "==> [2/4] 压实/摄取端到端演示（demo.py）"
+echo "==> [2/5] 压实/摄取端到端演示（demo.py）"
 "$PY" demo.py
-echo "==> [3/4] 数据质量画像自动化校验（tests/test_quality.py，含可手算样本）"
+echo "==> [3/5] 数据质量画像自动化校验（tests/test_quality.py，含可手算样本）"
 "$PY" -m pytest tests/test_quality.py -v
-echo "==> [4/4] 数据质量画像端到端演示（demo_quality.py）"
+echo "==> [4/5] 数据质量画像端到端演示（demo_quality.py）"
 "$PY" demo_quality.py
+echo "==> [5/5] 成组抽样切分自动化校验 + 端到端演示（tests/test_split.py / demo_split.py）"
+"$PY" -m pytest tests/test_split.py -v
+"$PY" demo_split.py
 echo "==> 全部完成"

@@ -254,6 +254,33 @@ class LakeTable:
 
         return batch_record(self, batch_key)
 
+    # ------------------------------------------------------- 成组抽样切分
+    def create_split(
+        self,
+        train: int,
+        validation: int,
+        test: int,
+        seed: int,
+        version: int | None = None,
+        batch_size: int | None = None,
+    ) -> dict:
+        """按 row_id 成组抽样产出 train/validation/test 三个 Parquet 子集。
+
+        详见 lake/splits/split.py：同一 row_id 的全部可见行必然落在同一个
+        子集；分配只依赖 seed 与 row_id，与 Parquet 文件顺序、压实无关。
+        """
+        from .splits.split import DEFAULT_BATCH_SIZE, create_split
+
+        return create_split(
+            self,
+            version,
+            train,
+            validation,
+            test,
+            seed,
+            batch_size=DEFAULT_BATCH_SIZE if batch_size is None else batch_size,
+        )
+
     # ------------------------------------------------------------ 内部工具
     def _all_deleted_positions(self, manifest: dict) -> dict[str, set[int]]:
         """读取该 manifest 引用的全部删除文件，按 data_file_id 归组。"""

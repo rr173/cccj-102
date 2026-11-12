@@ -1,13 +1,13 @@
 {
-  "created_at": 1794476711.126582,
+  "created_at": 1794485490.3227081,
   "data_files": {
-    "46b880834261443db758831d266e6192": {
-      "num_rows": 24,
-      "path": "data/data-46b880834261443db758831d266e6192.parquet"
-    },
-    "d24d5e4fccea4a578417ae9cd14ab287": {
+    "632ce10dadfe46d49866ea5782adca03": {
       "num_rows": 4,
-      "path": "data/data-d24d5e4fccea4a578417ae9cd14ab287.parquet"
+      "path": "data/data-632ce10dadfe46d49866ea5782adca03.parquet"
+    },
+    "cc77b85af2404b4b92f549f9a453de3c": {
+      "num_rows": 24,
+      "path": "data/data-cc77b85af2404b4b92f549f9a453de3c.parquet"
     }
   },
   "delete_files": {},

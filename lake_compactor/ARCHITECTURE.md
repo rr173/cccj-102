@@ -211,3 +211,44 @@ HEAD 一次翻转生效：**这就是唯一可见性边界**，不存在“先�
 - **参考程序**：`quality/reference.py` 不 import 生产扫描/聚合代码，
   用独立的纯 Python 逐行路径重算同一批指标，供小样本手算交叉核对
   （`cross_check`）。
+
+## 11. 按 row_id 成组抽样的数据切分（lake/splits/）
+
+```
+<root>/splits/
+  LOCK                              跨进程 flock（进程内 RLock 可重入）
+  <split_id>/                       已交付：三个子集 + 清单，一次改名发布
+    train.parquet
+    validation.parquet
+    test.parquet
+    manifest.json
+  .staging-<split_id>-<uuid>/       发布前的暂存目录（不在正式路径上）
+```
+
+- **抽样单位是对象组**：`row_id` 相同的全部可见行（固定快照经位置删除
+  过滤后）必须落在同一个子集。这也是“不能按行随机”的原因：同一对象的
+  观测若拆散，训练集与评测集会共享对象，离线指标虚高。
+- **稳定散列**：`SHA-256(str(seed) + \x00 + row_id)[:8] % 10000`，按权重
+  在 `[0, 10000)` 上切成 train / validation / test 三段。只依赖 seed 与
+  row_id，因此重排 Parquet 文件、改变 manifest 键序、先压实都不改变
+  归属；同一 `row_id` 的多条观测天然同桶。散列只承诺长期比例，小数据
+  数量可偏斜，清单显式记录。
+- **固定输入**：`version=None` 时在提交锁下只读一次 HEAD；显式
+  `version` 时校验存在性。读取全程持 `table.lease(version)`，GC 不会
+  回收输入，运行期间的新 snapshot/压实不改变本次输入。清单记录输入
+  snapshot 与可见行/对象数。
+- **身份与不可替换**：`split_id = SHA-256(算法版本 + 输入 snapshot +
+  权重 + seed)[:16]`。相同参数命中同一目录 → 原样复用（`reused=true`，
+  文件不改写）；参数变化 → 新目录，旧交付保留。算法实现变化时提升
+  `algorithm_version`，旧交付不会被误认为相同参数。
+- **原子交付**：三个文件与清单先写进 `.staging-<split_id>-<uuid>/`，
+  刷盘后写入每个文件的 SHA-256，再逐项核对（行数/对象数/校验和/对象
+  不跨集合/三集合合计等于输入）。全部通过后 `os.rename` 到正式目录，
+  一次发布。发布前退出只有 `.staging-*` 残骸，正式路径不可见；下次调用
+  在 `splits/LOCK` 内确认目标缺失后清残骸重做。测试钩子
+  `LAKE_SPLIT_CRASH_POINT=staged|published` 用真实 `os._exit` 子进程验证。
+- **独立校验**：`check_split.py` 只读交付目录、不 import 扫描代码，可
+  `--verify-assignment` 按清单参数复算归属；包内 `lake.splits.check_split`
+  是同一份逻辑，用于发布前与“相同参数复用”时的完好性核对。
+- **与源数据解耦**：交付目录不在 GC 扫描范围内，子集文件自包含；源数据
+  被压实替换或被 GC 回收后，子集仍可直接读取与校验。

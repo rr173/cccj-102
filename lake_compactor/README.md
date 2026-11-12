@@ -15,15 +15,20 @@ Python + PyArrow + DuckDB，元数据用本机文件与 flock 实现，单机多
 - **数据质量画像**：按修订号冻结完整质量报告（样本量/空字段/重复标识/
   数值极值合计/左闭右开分段计数/规则逐条判定），报告只读、自包含，
   支持两份报告的指标差值与异常新出现/消失/持续比较（见 [QUALITY.md](QUALITY.md)）
+- **按对象成组抽样**：以 `row_id` 为抽样单位产出 train/validation/test
+  三个 Parquet 子集，同一对象的多条观测必然同属一个子集；分配只依赖
+  seed 与 row_id，与文件排列、压实无关（见 [SPLIT.md](SPLIT.md)）
 
 ## 运行
 
 ```bash
-./run.sh                 # 自动化校验 + 压实/摄取演示 + 质量画像演示
+./run.sh                 # 自动化校验 + 压实/摄取/质量画像/切分演示
 # 或分别运行：
-python3 -m pytest -v     # 52 个端到端用例（真实读写 Parquet、真实多进程交错）
+python3 -m pytest -v     # 76 个端到端用例（真实读写 Parquet、真实多进程交错）
 python3 demo.py          # 叙述式演示 12 个场景
 python3 demo_quality.py  # 质量画像 10 个验收场景（本地样本、可手算核对）
+python3 demo_split.py    # 成组抽样切分 11 个验收场景
+python3 check_split.py <交付目录> --verify-assignment   # 独立分组校验脚本
 ```
 
 依赖：`pyarrow`、`duckdb`、`pytest`（可用 `PYTHON=/path/to/python` 指定解释器）。
@@ -54,6 +59,43 @@ diff   = compare_reports(old_report, new_report)    # 指标差值 + 异常迁�
   计算程序，供小样本手算交叉核对。
 
 CLI：`python3 -m lake.quality.cli {create,show,list,compare,reference} ...`
+
+## 按对象成组抽样的数据切分（split）
+
+一个业务对象可能对应多条训练观测。若按行抽样，同一对象会同时出现在
+训练集和评测集，离线指标虚高。切分以 `row_id` 为抽样单位成组分配：
+
+```python
+from lake import LakeTable
+from lake.splits import check_split
+
+table = LakeTable.open("./mylake")
+manifest = table.create_split(
+    train=8000, validation=1000, test=1000,
+    seed=42, version=None,          # version=None：调用时固定当前 HEAD
+)
+# manifest: split_id / input_version / weights / seed / algorithm_version /
+#           各子集行数、对象数、SHA-256 / proportionality_notice
+directory = f"{table.root}/splits/{manifest['split_id']}"
+# 直接读取： <directory>/{train,validation,test}.parquet
+check_split(directory)              # 独立校验：对象不跨集合、不重不漏
+```
+
+- 权重是非负整数“万分份”，总和必须为 10000；任何可见行 `row_id` 为空
+  → `SplitError`，整次拒绝且不落盘；
+- 归属 = `SHA-256(seed, row_id)` 对 10000 取模后落权重区间，只依赖
+  `seed` 与 `row_id`：重排 Parquet 文件、先压实都不改变归属；
+- 散列只承诺**长期比例**接近权重，小数据实际数量可以偏斜，清单里显式
+  记录该口径；
+- 相同参数（相同 snapshot + 权重 + seed）再次调用返回原切分（文件字节
+  不变）；参数变化生成新 `split_id`，旧交付原样保留；
+- 三个文件 + `manifest.json` 先写进 `.staging-<id>-<uuid>/`，逐项核对
+  后一次目录改名发布：发布前退出，目标路径不可见半成品，再次调用完成
+  交付；读取期间持读者租约，源数据被 GC 回收后交付子集仍可直接读取。
+
+CLI：`python3 -m lake.splits.cli {create,check,list} ...`；
+独立校验：`python3 check_split.py <交付目录> [--verify-assignment]`。
+详见 [SPLIT.md](SPLIT.md)。
 
 ## 微批摄取契约（ingest_batch）
 
@@ -102,10 +144,16 @@ result = table.ingest_batch(batch_key, messages)
 | `lake/quality/compare.py` | 报告比较：指标差值、异常新出现/消失/持续 |
 | `lake/quality/reference.py` | 独立纯 Python 参考计算程序（与生产路径分开） |
 | `lake/quality/cli.py` | 质量画像命令行入口（create/show/list/compare/reference） |
+| `lake/splits/split.py` | 按 row_id 成组抽样：稳定散列分配、固定 snapshot 流式读取、暂存目录 + 一次改名发布、身份复用 |
+| `lake/splits/cli.py` | 切分命令行入口（create/check/list） |
+| `check_split.py` | 独立分组校验脚本（只读交付目录，可复算归属） |
 | `tests/test_engine.py` | 压实引擎校验（屏障交错、冲突、崩溃、租约、原子发布压力） |
 | `tests/test_ingest.py` | 摄取事务校验（多分片、重发、争抢、并发、崩溃恢复、旧表兼容） |
 | `tests/test_quality.py` | 质量画像验收（手算样本、整理一致、删行、违规、错配、复用、租约、崩溃、GC 后可用） |
+| `tests/test_split.py` | 切分验收（成组不重不漏、文件排列/压实不变、snapshot 推进、空标识、坏权重、身份复用、发布边界崩溃、GC 后读取） |
 | `demo.py` | 叙述式端到端演示 |
 | `demo_quality.py` | 质量画像叙述式演示（10 个验收场景） |
+| `demo_split.py` | 成组抽样切分叙述式演示（11 个验收场景） |
 | `QUALITY.md` | 画像规则配置、报告字段、接口与存储语义说明 |
+| `SPLIT.md` | 成组抽样切分的参数、算法、清单字段与交付语义 |
 | `ARCHITECTURE.md` | 架构说明 |
