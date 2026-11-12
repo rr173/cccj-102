@@ -1,6 +1,7 @@
 {
   "batch_key": "srcB-2",
-  "created_at": 1794500554.9601426,
+  "branch": "main",
+  "created_at": 1794511593.190659,
   "cursors_after": {
     "srcB": {
       "0": 6
@@ -21,7 +22,7 @@
       "1": 2
     }
   },
-  "data_file_id": "55137899013c4406b0eb51668aaa411c",
+  "data_file_id": "f0f8ef99acaa4934b9987f43f9aa55fe",
   "digest": "96c61a65aa0e94c70042323e3c5a859c5c8ab0899cf773b3034eea2c4034901d",
   "messages": [
     [

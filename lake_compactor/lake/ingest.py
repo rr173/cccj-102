@@ -10,8 +10,18 @@
     （BatchRejectedError），任何分片的游标都不推进，数据不入湖；
   - 未出现在批内的分片维持原游标；
   - 成功后游标、请求摘要、receipt 与本批数据文件在同一个 manifest
-    版本里原子发布（HEAD 翻转即唯一可见性边界），不存在
+    版本里原子发布（本线尖端翻转即唯一可见性边界），不存在
     “先写进度再补数据”的窗口，也不需要补偿修正。
+
+分支隔离（实验分支）：
+
+  - 游标与批次索引都随 manifest 携带，因此天然**按分支独立**：两条
+    分支各自从自己的父提交继承进度，各自推进，互不可见。
+  - receipt 由 `batch_key + 内容摘要 + 分支名` 决定，同一请求键与内容
+    在两条分支上会得到不同 receipt；一条分支的回执绝不被另一条借用。
+  - 批次记录文件名同样带分支名，同 key 的两条分支不会互相覆盖审计载体。
+  - 只有当前绑定分支尖端的批次索引能证明“已提交”：在另一条分支上
+    重放同一 key 不会命中本线之外的索引。
 
 幂等与重放：
 
@@ -25,7 +35,7 @@
   - prepared：临时数据文件已写、未进提交锁 → 游标未被吃掉，重发全量重做；
   - recorded：批次记录已写、manifest 未发布 → 记录是孤儿，不被任何
     manifest 引用即不可见，重发全量重做，GC 清理孤儿；
-  - published：HEAD 已翻转、确认未返回 → 重启重放从 manifest 找到
+  - published：尖端已翻转、确认未返回 → 重启重放从 manifest 找到
     原 receipt 直接返回。
 """
 
@@ -51,7 +61,7 @@ from .table import DATA_SCHEMA, LakeTable
 #    "batches": {batch_key: {"record": rel_path, "receipt": ..., "version": ...,
 #                            "digest": ..., "num_rows": ...,
 #                            "cursors_after": {source: {partition: next_offset}}}}}
-# batches 只增不减，随每个新版本原样携带，因此“批次是否生效”以当前
+# batches 只增不减，随每个新版本原样携带，因此“批次是否生效”以本线
 # manifest 为准，记录文件本身不构成提交证据。
 EMPTY_INGEST = {"cursors": {}, "batches": {}}
 
@@ -102,10 +112,28 @@ def messages_digest(normalized: list[list]) -> str:
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 
-def make_receipt(batch_key: str, digest: str) -> str:
-    """稳定 receipt：由 batch_key 与内容摘要确定性导出，重放必然相同。"""
-    h = hashlib.sha256(f"{batch_key}\x00{digest}".encode("utf-8")).hexdigest()
+def make_receipt(batch_key: str, digest: str, branch: str = mf.MAIN_BRANCH) -> str:
+    """稳定 receipt：由 batch_key、内容摘要与分支名确定性导出。
+
+    分支名进入哈希，因此同一请求键与内容在两条分支上的回执不同——
+    回执只在本线有效，不会被另一条线重放借用。main 分支的表达式与
+    旧实现逐字节兼容（branch 不参与主分支的哈希），旧表回执不变。
+    """
+    material = f"{batch_key}\x00{digest}"
+    if branch != mf.MAIN_BRANCH:
+        material += f"\x00{branch}"
+    h = hashlib.sha256(material.encode("utf-8")).hexdigest()
     return f"rcpt-{h[:32]}"
+
+
+def _record_rel_path(table: LakeTable, batch_key: str, branch: str) -> str:
+    key_hash = hashlib.sha256(batch_key.encode("utf-8")).hexdigest()[:32]
+    if branch == mf.MAIN_BRANCH:
+        name = f"batch-{key_hash}.json"
+    else:
+        branch_hash = hashlib.sha256(branch.encode("utf-8")).hexdigest()[:16]
+        name = f"batch-{key_hash}-{branch_hash}.json"
+    return os.path.join(INGEST_REL_DIR, name)
 
 
 # --------------------------------------------------------------------------
@@ -117,16 +145,17 @@ def ingest_state(manifest_obj: dict) -> dict:
 
 
 def ingest_cursors(table: LakeTable, version: int | None = None) -> dict:
-    """查询指定版本（默认当前版本）各分片的消费游标（下一个期望 offset）。"""
+    """查询绑定分支（或显式提交）各分片的消费游标（下一个期望 offset）。"""
     return copy.deepcopy(ingest_state(table.manifest(version))["cursors"])
 
 
 def batch_record(table: LakeTable, batch_key: str) -> dict | None:
-    """查询已提交批次的完整记录（含规范化消息与游标变迁）；未提交返回 None。
+    """查询绑定分支尖端已提交批次的完整记录；未提交返回 None。
 
-    是否生效以当前 manifest 的批次索引为准；记录文件只是审计载体。
+    是否生效以**本线**尖端 manifest 的批次索引为准；另一条分支上的
+    同名请求键不属于本线，记录文件只是审计载体。
     """
-    committed = ingest_state(mf.load_current(table.meta_root))["batches"].get(batch_key)
+    committed = ingest_state(table.manifest())["batches"].get(batch_key)
     if committed is None:
         return None
     try:
@@ -206,11 +235,12 @@ def ingest_batch(table: LakeTable, batch_key: str, messages) -> dict:
     normalized = normalize_messages(messages)
     digest = messages_digest(normalized)
 
-    # 快路径：已提交的批次直接重放。manifest 不可变且批次索引只增不减，
-    # 读到的任何版本都足以确证“已提交”；读不到则走完整路径在锁内复核。
-    committed = ingest_state(mf.load_current(table.meta_root))["batches"].get(batch_key)
+    # 快路径：本线已提交的批次直接重放。manifest 不可变且批次索引只增
+    # 不减，读到的任何本线版本都足以确证“已提交”；读不到则走完整路径
+    # 在锁内复核。另一条分支的同名 key 不在本线索引里，自然不会被命中。
+    committed = ingest_state(table.manifest())["batches"].get(batch_key)
     if committed is not None:
-        return _replay_result(batch_key, committed, digest)
+        return _replay_result(table.branch, batch_key, committed, digest)
 
     # 准备阶段：数据文件先写临时名（不在读路径上），崩溃只留下 GC 可回收的
     # .tmp 残骸，游标、receipt、版本都未被动过——重发等于全量重做。
@@ -230,11 +260,12 @@ def ingest_batch(table: LakeTable, batch_key: str, messages) -> dict:
 
     try:
         with table.lock():
-            cur = mf.load_current(table.meta_root)
+            # 锁内以**本线尖端**为父复核：另一条线推进不构成本线冲突。
+            cur = table._current_manifest()
             state = ingest_state(cur)
             committed = state["batches"].get(batch_key)
-            if committed is not None:  # 锁内权威复核：并发提交者已抢先
-                return _replay_result(batch_key, committed, digest)
+            if committed is not None:  # 锁内权威复核：本线并发提交者已抢先
+                return _replay_result(table.branch, batch_key, committed, digest)
 
             reasons = _validate_against_cursors(state["cursors"], normalized)
             if reasons:
@@ -253,14 +284,13 @@ def ingest_batch(table: LakeTable, batch_key: str, messages) -> dict:
                 cursors_after.setdefault(source, {})[part] = new_cursor
 
             # 3) 批次记录（请求摘要 + receipt + 规范化消息）先于 manifest 就位。
-            receipt = make_receipt(batch_key, digest)
+            receipt = make_receipt(batch_key, digest, table.branch)
             new = table._next(cur)
             version = new["version"]
-            record_rel = os.path.join(
-                INGEST_REL_DIR, f"batch-{hashlib.sha256(batch_key.encode('utf-8')).hexdigest()[:32]}.json"
-            )
+            record_rel = _record_rel_path(table, batch_key, table.branch)
             record = {
                 "batch_key": batch_key,
+                "branch": table.branch,
                 "digest": digest,
                 "receipt": receipt,
                 "version": version,
@@ -278,7 +308,7 @@ def ingest_batch(table: LakeTable, batch_key: str, messages) -> dict:
             _maybe_crash("recorded")
 
             # 4) 游标 + 请求摘要 + receipt + 数据文件引用随同一 manifest 发布；
-            #    HEAD 翻转即唯一可见性边界，对其他写者的成果原样携带。
+            #    本线尖端翻转即唯一可见性边界，对本线既有成果原样携带。
             new["data_files"][fid] = {"path": rel, "num_rows": len(normalized)}
             ing = new["ingest"]
             for source, parts in cursors_after.items():
@@ -295,6 +325,7 @@ def ingest_batch(table: LakeTable, batch_key: str, messages) -> dict:
             result = {
                 "receipt": receipt,
                 "batch_key": batch_key,
+                "branch": table.branch,
                 "version": version,
                 "cursors": cursors_after,
                 "num_rows": len(normalized),
@@ -311,7 +342,7 @@ def ingest_batch(table: LakeTable, batch_key: str, messages) -> dict:
     return result
 
 
-def _replay_result(batch_key: str, committed: dict, digest: str) -> dict:
+def _replay_result(branch: str, batch_key: str, committed: dict, digest: str) -> dict:
     """已提交批次的重放：内容一致返回原 receipt，不一致报幂等冲突。"""
     if committed["digest"] != digest:
         raise IdempotencyConflictError(
@@ -324,6 +355,7 @@ def _replay_result(batch_key: str, committed: dict, digest: str) -> dict:
     return {
         "receipt": committed["receipt"],
         "batch_key": batch_key,
+        "branch": branch,
         "version": committed["version"],
         "cursors": copy.deepcopy(committed["cursors_after"]),
         "num_rows": committed["num_rows"],

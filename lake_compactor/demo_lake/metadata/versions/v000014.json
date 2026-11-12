@@ -1,17 +1,18 @@
 {
-  "created_at": 1794500554.7641528,
+  "branch": "main",
+  "created_at": 1794511592.9138567,
   "data_files": {
-    "13ab9eee6e604e278bfcf07617522184": {
+    "216c76aceef84bdbbdee67fce7ae6a88": {
+      "num_rows": 10,
+      "path": "data/data-216c76aceef84bdbbdee67fce7ae6a88.parquet"
+    },
+    "255189629b1f4767acb6eff616fe0754": {
+      "num_rows": 10,
+      "path": "data/data-255189629b1f4767acb6eff616fe0754.parquet"
+    },
+    "63604d8d63514107917e54aa42a98775": {
       "num_rows": 4,
-      "path": "data/data-13ab9eee6e604e278bfcf07617522184.parquet"
-    },
-    "4e8c10fefb524f09a659191c3b125197": {
-      "num_rows": 10,
-      "path": "data/data-4e8c10fefb524f09a659191c3b125197.parquet"
-    },
-    "b79b3e3c46b64028a38751aa636f423f": {
-      "num_rows": 10,
-      "path": "data/data-b79b3e3c46b64028a38751aa636f423f.parquet"
+      "path": "data/data-63604d8d63514107917e54aa42a98775.parquet"
     }
   },
   "delete_files": {},

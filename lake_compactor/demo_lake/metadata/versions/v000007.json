@@ -1,38 +1,39 @@
 {
-  "created_at": 1794500554.6574092,
+  "branch": "main",
+  "created_at": 1794511592.7486672,
   "data_files": {
-    "4bc6eab4c45547c88bad7fdcca4d1bd9": {
-      "num_rows": 8,
-      "path": "data/data-4bc6eab4c45547c88bad7fdcca4d1bd9.parquet"
-    },
-    "72a0e30dd811462ca24e9b3fb46dd10a": {
+    "172b2ca95ffd4642aa58763ff4481566": {
       "num_rows": 0,
-      "path": "data/data-72a0e30dd811462ca24e9b3fb46dd10a.parquet"
+      "path": "data/data-172b2ca95ffd4642aa58763ff4481566.parquet"
     },
-    "99cde9e2e8c147e59ffe6d4575b6be7b": {
+    "24e82a14a34640d688294546a4fa66e8": {
+      "num_rows": 8,
+      "path": "data/data-24e82a14a34640d688294546a4fa66e8.parquet"
+    },
+    "da17d7af21cf45d99ba15ff433fac719": {
       "num_rows": 6,
-      "path": "data/data-99cde9e2e8c147e59ffe6d4575b6be7b.parquet"
+      "path": "data/data-da17d7af21cf45d99ba15ff433fac719.parquet"
     },
-    "a9511d9688d9413595ff0ef74de9bebd": {
+    "e40399fa72764f51b0dbe60f061df16c": {
       "num_rows": 3,
-      "path": "data/data-a9511d9688d9413595ff0ef74de9bebd.parquet"
+      "path": "data/data-e40399fa72764f51b0dbe60f061df16c.parquet"
     }
   },
   "delete_files": {
-    "274278bc46bc4403ae336ed1c5bf8010": {
-      "num_deletes": 3,
-      "path": "data/deletes-274278bc46bc4403ae336ed1c5bf8010.parquet",
-      "target": "a9511d9688d9413595ff0ef74de9bebd"
-    },
-    "6035fc9b1b4e4537abc0046205640068": {
-      "num_deletes": 1,
-      "path": "data/deletes-6035fc9b1b4e4537abc0046205640068.parquet",
-      "target": "4bc6eab4c45547c88bad7fdcca4d1bd9"
-    },
-    "7bbb1ee68cfc41639ccb57d5b389b8d2": {
+    "2cb01a38b1b5432cb910e884d2918b72": {
       "num_deletes": 2,
-      "path": "data/deletes-7bbb1ee68cfc41639ccb57d5b389b8d2.parquet",
-      "target": "4bc6eab4c45547c88bad7fdcca4d1bd9"
+      "path": "data/deletes-2cb01a38b1b5432cb910e884d2918b72.parquet",
+      "target": "24e82a14a34640d688294546a4fa66e8"
+    },
+    "392bd28787fb44d58e0f91be6a9901e1": {
+      "num_deletes": 3,
+      "path": "data/deletes-392bd28787fb44d58e0f91be6a9901e1.parquet",
+      "target": "e40399fa72764f51b0dbe60f061df16c"
+    },
+    "aa0e4f43143c4f88a96936ad04f0c877": {
+      "num_deletes": 1,
+      "path": "data/deletes-aa0e4f43143c4f88a96936ad04f0c877.parquet",
+      "target": "24e82a14a34640d688294546a4fa66e8"
     }
   },
   "ingest": {

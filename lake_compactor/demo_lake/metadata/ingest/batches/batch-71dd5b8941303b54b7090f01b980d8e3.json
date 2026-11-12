@@ -1,6 +1,7 @@
 {
   "batch_key": "srcA-2",
-  "created_at": 1794500554.955029,
+  "branch": "main",
+  "created_at": 1794511593.1861463,
   "cursors_after": {
     "srcA": {
       "0": 6
@@ -21,7 +22,7 @@
       "1": 2
     }
   },
-  "data_file_id": "44f78637795f4b73a7ced26314061485",
+  "data_file_id": "6bcc1ef501b741c5a455f6875413d2e4",
   "digest": "be0ee662bdbe4189702c836e528dac3470e9faaa05e79ed8634b6652ee986846",
   "messages": [
     [

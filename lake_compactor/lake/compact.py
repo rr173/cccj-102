@@ -1,15 +1,19 @@
 """压实：生成计划（staging 候选）与提交计划（原子发布）。
 
-create_plan  在基版本 V 选中若干小文件，剔除已删除行，把活行合并成
-             一个新的候选 Parquet 写入 staging/，并记录
-             “旧物理行号 -> 新物理行号”的映射。候选不进入读路径。
+create_plan  在绑定分支的尖端 V 选中若干小文件，剔除已删除行，把活行
+             合并成一个新候选 Parquet 写入 staging/，并记录
+             “旧物理行号 -> 新物理行号”的映射与生成时所在的分支。
+             候选不进入读路径。
 
-commit_plan  在提交锁下把当前版本 W 与基版本 V 比较：
+commit_plan  在提交锁下把**本线**当前尖端 W 与基版本 V 比较：
+             - 计划绑定的分支必须与提交者当前绑定分支一致，否则拒绝；
              - 选中文件若在 W 中已不存在（被别的压实替换）→ 冲突失败；
              - W 相对 V 的新增追加文件原样保留；
              - W 相对 V 新到的、针对选中文件的删除，按映射翻译到
                新文件的物理位置上，随新版本一起发布；
              - 基版本已有的删除已被物理剔除，随之吸收（不再保留）。
+             另一条分支上的推进完全不影响本线；本线内部的竞争仍按上述
+             规则仲裁。
 """
 
 from __future__ import annotations
@@ -24,7 +28,7 @@ import pyarrow.parquet as pq
 
 from . import manifest as mf
 from . import storage
-from .errors import ConflictError
+from .errors import BranchMismatchError, ConflictError
 from .table import DELETE_SCHEMA, LakeTable
 
 
@@ -45,6 +49,7 @@ def create_plan(
 
     selected 为 None 时按 max_rows 阈值自动挑选小文件；显式传入时保留
     给定顺序——该顺序就是活行在合并文件中的拼接顺序，位置映射据此生成。
+    计划记录生成时的分支名与基版本，提交时据此核验归属。
     """
     base = table.manifest()
     base_version = base["version"]
@@ -93,6 +98,8 @@ def create_plan(
     plan = {
         "plan_id": plan_id,
         "base_version": base_version,
+        "base_branch": table.branch,
+        "parent": base.get("parent"),
         "selected": selected,
         "merged_file": merged_file,
         "num_rows": total,
@@ -106,14 +113,21 @@ def create_plan(
 
 
 def commit_plan(table: LakeTable, plan_id: str) -> int:
-    """提交压实计划，原子发布新版本；冲突时抛 ConflictError。"""
+    """提交压实计划，原子发布到本线尖端；冲突时抛 ConflictError。"""
     pdir = _plan_dir(table, plan_id)
     plan = load_plan(table, plan_id)
     if plan["state"] != "executed":
         raise ValueError(f"plan {plan_id} is in state {plan['state']}")
 
     with table.lock():
-        cur = mf.load_current(table.meta_root)
+        # 计划属于生成它的那条分支：不能拿一条线的成果去推进另一条线。
+        if plan.get("base_branch", mf.MAIN_BRANCH) != table.branch:
+            raise BranchMismatchError(
+                f"plan {plan_id} was created on branch "
+                f"{plan.get('base_branch')!r}, cannot commit it on "
+                f"{table.branch!r}"
+            )
+        cur = table._current_manifest()  # 本线尖端，不是全库 HEAD
         base = mf.load_manifest(table.meta_root, plan["base_version"])
 
         # 冲突检测：选中文件已被其他压实替换（在当前版本中消失）。

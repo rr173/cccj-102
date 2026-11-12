@@ -20,17 +20,22 @@ Python + PyArrow + DuckDB，元数据用本机文件与 flock 实现，单机多
   与精确版本号），提交只读 SELECT（含 CTE/连接/过滤/分组/排序），直接拿
   Arrow 表或终端 CSV / JSON Lines；取数期间持读者租约，写语句、直接读
   文件、外部数据源与联网一律拒绝（见 [WORKBENCH.md](WORKBENCH.md)）
+- **实验分支**：`main` 是正式数据，实验者从任意已有提交建立命名分支，
+  起初共享底层内容，随后各自发展；提交号全库唯一并记录父提交与各线
+  尖端，写入只推进本线，`publish` 只允许快进交付，GC 按全部存活分支与
+  租约保护内容（见 [BRANCHES.md](BRANCHES.md)）
 
 ## 运行
 
 ```bash
-./run.sh                 # 自动化校验 + 压实/摄取/质量画像/切分/查询工作台演示
+./run.sh                 # 自动化校验 + 压实/摄取/质量画像/切分/查询工作台/分支演示
 # 或分别运行：
-python3 -m pytest -v     # 95 个端到端用例（真实读写 Parquet、真实多进程交错）
+python3 -m pytest -v     # 133 个端到端用例（真实读写 Parquet、真实多进程交错）
 python3 demo.py          # 叙述式演示 12 个场景
 python3 demo_quality.py  # 质量画像 10 个验收场景（本地样本、可手算核对）
 python3 demo_split.py    # 成组抽样切分 11 个验收场景
 python3 demo_workbench.py  # 查询工作台 5 组验收场景
+python3 demo_branches.py   # 实验分支 9 步验收（隔离/快进/拒绝分叉/并发接入/回收/重开）
 python3 check_split.py <交付目录> --verify-assignment   # 独立分组校验脚本
 ```
 
@@ -173,11 +178,12 @@ result = table.ingest_batch(batch_key, messages)
 | 文件 | 职责 |
 |---|---|
 | `lake/storage.py` | 原子写（tmp+fsync+rename）、目录 fsync、flock 锁 |
-| `lake/manifest.py` | manifest 版本读写、HEAD 原子发布点 |
-| `lake/table.py` | 建表、追加、发布位置删除、扫描、读者租约、摄取入口 |
-| `lake/ingest.py` | 微批摄取事务：消息规范化、游标校验、幂等重放、崩溃钩子 |
-| `lake/compact.py` | 生成压实计划（staging 候选+位置映射）、提交计划（冲突检测/删除翻译） |
-| `lake/gc.py` | 租约感知的垃圾回收（含孤儿批次记录、在途临时文件年龄保护） |
+| `lake/manifest.py` | manifest 版本读写、HEAD / 分支尖端原子发布点、全库唯一取号、祖先判定 |
+| `lake/branches.py` | 命名实验分支：名字校验、创建/列举/撤销、快进 publish（拒绝分叉与过期预期） |
+| `lake/table.py` | 分支绑定的表对象：建表、追加、发布位置删除、扫描、读者租约、摄取入口、checkout |
+| `lake/ingest.py` | 微批摄取事务：消息规范化、分支独立游标、按线 receipt/记录命名、幂等重放、崩溃钩子 |
+| `lake/compact.py` | 生成压实计划（staging 候选+位置映射+分支归属）、提交计划（冲突检测/删除翻译/跨线拒绝） |
+| `lake/gc.py` | 引用感知的垃圾回收：保护全部存活分支尖端 + 读者租约（含孤儿批次记录、在途临时文件年龄保护） |
 | `lake/verify.py` | DuckDB 多重集校验 |
 | `lake/quality/rules.py` | 画像规则规范化、格式校验、确定性 SHA-256 摘要 |
 | `lake/quality/profile.py` | 分批流式扫描与指标聚合（全表不入 Python 列表） |
@@ -196,11 +202,14 @@ result = table.ingest_batch(batch_key, messages)
 | `tests/test_quality.py` | 质量画像验收（手算样本、整理一致、删行、违规、错配、复用、租约、崩溃、GC 后可用） |
 | `tests/test_split.py` | 切分验收（成组不重不漏、文件排列/压实不变、snapshot 推进、空标识、坏权重、身份复用、发布边界崩溃、GC 后读取） |
 | `tests/test_workbench.py` | 查询工作台验收（独立期望行集、连接/分组、双版本对照、取数途中追加+压实+GC 的读者保护、空结果 schema、逐项拒绝与湖表不变） |
+| `tests/test_branches.py` | 实验分支验收（旧目录对应 main、名字/冲突、共享建立、全库唯一号与父链、写入隔离、同键并发接入隔离、跨线压实拒绝、快进/分叉/过期拒绝、整理与修改并存、撤销后租约保护再回收、重开持久化） |
 | `demo.py` | 叙述式端到端演示 |
 | `demo_quality.py` | 质量画像叙述式演示（10 个验收场景） |
 | `demo_split.py` | 成组抽样切分叙述式演示（11 个验收场景） |
 | `demo_workbench.py` | 查询工作台叙述式演示（5 组验收场景） |
+| `demo_branches.py` | 实验分支叙述式演示（9 步验收，逐步断言完整内容与状态） |
 | `QUALITY.md` | 画像规则配置、报告字段、接口与存储语义说明 |
 | `SPLIT.md` | 成组抽样切分的参数、算法、清单字段与交付语义 |
 | `WORKBENCH.md` | 查询工作台的登记表、查询语法、读者保护、安全边界与 CLI 说明 |
+| `BRANCHES.md` | 实验分支的名字规则、接口、隔离语义、publish 快进规则与回收口径 |
 | `ARCHITECTURE.md` | 架构说明 |

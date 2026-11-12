@@ -1,13 +1,14 @@
 {
-  "created_at": 1794500554.940477,
+  "branch": "main",
+  "created_at": 1794511593.166737,
   "data_files": {
-    "3db92a30e891403988cd8afcac61e776": {
+    "1e699e897a9847718301020aec9d02c3": {
       "num_rows": 31,
-      "path": "data/data-3db92a30e891403988cd8afcac61e776.parquet"
+      "path": "data/data-1e699e897a9847718301020aec9d02c3.parquet"
     },
-    "c49da5a376054eefae850392c397843c": {
+    "8d337d4f328e49dc8953c5ba3044922d": {
       "num_rows": 2,
-      "path": "data/data-c49da5a376054eefae850392c397843c.parquet"
+      "path": "data/data-8d337d4f328e49dc8953c5ba3044922d.parquet"
     }
   },
   "delete_files": {},

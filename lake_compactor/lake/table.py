@@ -1,4 +1,4 @@
-"""LakeTable：建表、追加、发布位置删除、扫描、读者租约。
+"""LakeTable：建表、追加、发布位置删除、扫描、读者租约、分支绑定。
 
 数据文件布局（全部在单机本地文件系统上）：
 
@@ -6,10 +6,23 @@
       data/                  已发布的数据文件与位置删除文件（不可变）
       staging/               未发布的压实候选（不在读路径上）
       metadata/
-        HEAD                 当前版本号（原子替换）
+        HEAD                 正式数据（main）的尖端版本号（原子替换）
+        branches.json        实验分支尖端 {name: tip}（无此文件 = 只有 main）
         LOCK                 flock 提交锁
-        versions/v*.json     不可变 manifest 版本
+        versions/v*.json     不可变 manifest 版本（全库唯一编号）
         leases/lease-*.json  读者租约
+
+分支语义：
+
+  - main 表示正式数据，`HEAD` 就是它的尖端；旧格式目录没有
+    branches.json，第一次使用时自然对应 main，旧调用无需传分支参数。
+  - 实验分支从某个已有提交建立，起初与来源共享全部底层内容文件
+    （manifest 版本之间没有数据拷贝，只有引用关系）。
+  - 每个 LakeTable 对象绑定一条分支（默认 main）。append /
+    publish_deletes / ingest_batch / commit_plan 只推进绑定分支的尖端；
+    版本号是全库唯一坐标，父提交指向本线尖端。
+  - 读取（scan / row_ids / ingest_cursors / batch_record）默认解析绑定
+    分支的尖端；显式 version 则是全库中的那个提交（可能来自任何分支）。
 
 数据文件带稳定 row_id 列，但删除一律按物理行号（0 起）记录与执行，
 绝不从业务字段（包括 row_id）反推行号。
@@ -30,15 +43,20 @@ import pyarrow.parquet as pq
 
 from . import manifest as mf
 from . import storage
-from .errors import LeaseError
+from .errors import BranchNotFoundError, ConflictError, LeaseError
+
 
 DATA_SCHEMA = pa.schema([("row_id", pa.string()), ("value", pa.int64())])
 DELETE_SCHEMA = pa.schema([("data_file_id", pa.string()), ("pos", pa.int64())])
 
 
 class LakeTable:
-    def __init__(self, root: str):
+    def __init__(self, root: str, branch: str = mf.MAIN_BRANCH):
+        from .branches import validate_name
+
+        validate_name(branch)
         self.root = os.path.abspath(root)
+        self.branch = branch
         self.meta_root = os.path.join(self.root, "metadata")
         self.data_dir = os.path.join(self.root, "data")
         self.staging_dir = os.path.join(self.root, "staging")
@@ -59,6 +77,7 @@ class LakeTable:
         m0 = {
             "version": 0,
             "parent": None,
+            "branch": mf.MAIN_BRANCH,
             "created_at": time.time(),
             "data_files": {},
             "delete_files": {},
@@ -68,10 +87,16 @@ class LakeTable:
         return t
 
     @classmethod
-    def open(cls, root: str) -> "LakeTable":
-        t = cls(root)
+    def open(cls, root: str, branch: str = mf.MAIN_BRANCH) -> "LakeTable":
+        """打开湖表并绑定一条分支；branch 默认 main（旧调用自然兼容）。"""
+        from .branches import validate_name
+
+        validate_name(branch)
+        t = cls(root, branch=branch)
         if not os.path.exists(mf.head_path(t.meta_root)):
             raise FileNotFoundError(f"no lake table at {root}")
+        if branch != mf.MAIN_BRANCH and branch not in mf.load_branches(t.meta_root):
+            raise BranchNotFoundError(f"branch {branch!r} does not exist")
         return t
 
     # ------------------------------------------------------------------ 锁
@@ -80,26 +105,47 @@ class LakeTable:
 
     # ------------------------------------------------------------- manifest
     def current_version(self) -> int:
-        return mf.current_version(self.meta_root)
+        """绑定分支的尖端版本号（main 即 HEAD）。"""
+        return mf.branch_tip(self.meta_root, self.branch)
 
     def manifest(self, version: int | None = None) -> dict:
+        """version=None 取绑定分支尖端；显式版本则是全库坐标中的那个提交。"""
         v = self.current_version() if version is None else version
         return mf.load_manifest(self.meta_root, v)
 
-    def _publish(self, manifest: dict) -> None:
-        mf.publish_manifest(self.meta_root, manifest)
+    def _current_manifest(self) -> dict:
+        return mf.load_manifest(self.meta_root, self.current_version())
 
-    @staticmethod
-    def _next(cur: dict) -> dict:
-        """以 cur 为父版本构造下一版本的骨架（文件字典浅拷贝，ingest 深拷贝）。
+    def _publish(self, manifest: dict) -> None:
+        """把新提交发布到**绑定分支**的尖端（manifest 已不可变落盘）。
+
+        提交前核验父提交正是绑定分支当前的尖端：另一条线推进版本不构成
+        本线冲突，但本对象若基于旧尖端构造提交，则必须明确失败而不是
+        悄悄把本线尖端倒退或旁路。
+        """
+        tip = self.current_version()
+        if manifest.get("parent") != tip:
+            raise ConflictError(
+                f"stale commit on branch {self.branch!r}: parent "
+                f"v{manifest.get('parent')} but branch tip is v{tip}"
+            )
+        mf.write_manifest(self.meta_root, manifest)
+        if self.branch == mf.MAIN_BRANCH:
+            mf.set_head(self.meta_root, manifest["version"])
+        else:
+            mf.set_branch_tip(self.meta_root, self.branch, manifest["version"])
+
+    def _next(self, cur: dict) -> dict:
+        """以本线尖端 cur 为父构造下一版本（版本号取全库最大值 + 1）。
 
         ingest 段（接入游标 + 批次索引）必须随每个新版本原样携带，
-        这样追加 / 删除 / 压实 / 摄取任何一条提交路径都不会丢别人的进度。
+        这样追加 / 删除 / 压实 / 摄取任何一条提交路径都不会丢进度。
         旧格式 manifest 没有该段，按空状态补齐。
         """
         return {
-            "version": cur["version"] + 1,
+            "version": mf.next_version(self.meta_root),
             "parent": cur["version"],
+            "branch": self.branch,
             "created_at": time.time(),
             "data_files": dict(cur["data_files"]),
             "delete_files": dict(cur["delete_files"]),
@@ -107,6 +153,35 @@ class LakeTable:
                 cur.get("ingest") or {"cursors": {}, "batches": {}}
             ),
         }
+
+    # ---------------------------------------------------------------- 分支
+    def checkout(self, name: str) -> "LakeTable":
+        """切换访问对象：返回绑定到 name 分支的新 LakeTable（共享同一目录）。"""
+        return LakeTable.open(self.root, branch=name)
+
+    def create_branch(self, name: str, from_version: int | None = None) -> dict:
+        """从某个已有提交建立命名实验分支；返回 {"name","tip","base_version"}。"""
+        from .branches import create_branch
+
+        return create_branch(self, name, from_version=from_version)
+
+    def delete_branch(self, name: str) -> dict:
+        """撤销实验分支（main 受保护）；其独占内容由之后的 GC 回收。"""
+        from .branches import delete_branch
+
+        return delete_branch(self, name)
+
+    def list_branches(self) -> list[dict]:
+        """列举全部存活分支（含 main）的尖端、父提交与提交信息。"""
+        from .branches import list_branches
+
+        return list_branches(self)
+
+    def publish(self, expected_main_version: int) -> dict:
+        """把当前绑定分支的尖端快进交给 main；仅当 main 是其祖先时允许。"""
+        from .branches import publish
+
+        return publish(self, expected_main_version)
 
     # ---------------------------------------------------------------- 追加
     def append(self, rows) -> str:
@@ -124,26 +199,26 @@ class LakeTable:
         tmp = os.path.join(self.data_dir, f".tmp-{fid}")
         pq.write_table(table, tmp)
         with self.lock():
-            # 先把数据文件就位，再发布引用它的 manifest，最后翻转 HEAD。
+            # 先把数据文件就位，再发布引用它的 manifest，最后翻转本线尖端。
             os.replace(tmp, os.path.join(self.root, rel))
             storage.fsync_dir(self.data_dir)
-            new = self._next(mf.load_current(self.meta_root))
+            new = self._next(self._current_manifest())
             new["data_files"][fid] = {"path": rel, "num_rows": len(rows)}
             self._publish(new)
         return fid
 
     # ---------------------------------------------------------- 位置删除
     def publish_deletes(self, data_file_id: str, positions) -> int:
-        """针对一个数据文件发布位置删除（0 起物理行号），返回新版本号。
+        """针对当前分支可见的一个数据文件发布位置删除（0 起物理行号）。
 
         删除文件内每行显式记录 (data_file_id, pos)；一个删除文件只针对
-        一个数据文件，便于压实时按文件整体吸收或翻译。
+        一个数据文件，便于压实时按文件整体吸收或翻译。只推进本线尖端。
         """
         positions = sorted({int(p) for p in positions})
         if not positions:
             raise ValueError("positions must be non-empty")
         with self.lock():
-            cur = mf.load_current(self.meta_root)
+            cur = self._current_manifest()
             meta = cur["data_files"].get(data_file_id)
             if meta is None:
                 raise KeyError(f"unknown data file {data_file_id}")
@@ -183,6 +258,7 @@ class LakeTable:
     def scan(self, version: int | None = None) -> pa.Table:
         """固定一个 manifest 版本，按其中的位置删除过滤后返回活行。
 
+        version=None 取绑定分支的尖端；显式版本是全库坐标中的提交。
         位置过滤用 PyArrow 完成：pyarrow.parquet 按文件物理顺序读出行，
         与删除项的 0 起物理行号严格对应（不依赖任何业务字段）。
         """
@@ -207,7 +283,7 @@ class LakeTable:
     # ---------------------------------------------------------------- 租约
     @contextmanager
     def lease(self, version: int | None = None, require_files: bool = False):
-        """读者租约：保护指定版本（默认当前版本）引用的全部文件不被 GC。
+        """读者租约：保护指定版本（默认绑定分支尖端）引用的全部文件不被 GC。
 
         租约的创建与 GC 都在同一把提交锁下执行，因此 GC 不会漏看
         一个刚刚创建好的租约；持租约期间可安全扫描旧版本。
@@ -245,6 +321,7 @@ class LakeTable:
                 {
                     "lease_id": lid,
                     "version": v,
+                    "branch": self.branch,
                     "pid": os.getpid(),
                     "created_at": time.time(),
                 },
@@ -259,19 +336,19 @@ class LakeTable:
 
     # ------------------------------------------------------------ 微批摄取
     def ingest_batch(self, batch_key: str, messages) -> dict:
-        """可重放的微批摄取事务，详见 lake/ingest.py。"""
+        """可重放的微批摄取事务（只推进绑定分支的尖端），见 lake/ingest.py。"""
         from .ingest import ingest_batch
 
         return ingest_batch(self, batch_key, messages)
 
     def ingest_cursors(self, version: int | None = None) -> dict:
-        """查询指定版本（默认当前）各来源分片的消费游标。"""
+        """查询绑定分支（或显式版本）各来源分片的消费游标。"""
         from .ingest import ingest_cursors
 
         return ingest_cursors(self, version)
 
     def batch_record(self, batch_key: str) -> dict | None:
-        """查询已提交批次的记录；未提交返回 None。"""
+        """查询绑定分支尖端已提交批次的记录；未提交返回 None。"""
         from .ingest import batch_record
 
         return batch_record(self, batch_key)

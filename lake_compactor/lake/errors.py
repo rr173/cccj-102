@@ -54,6 +54,94 @@ class ProfileNotFoundError(LakeError):
     """指定（修订号, 规则摘要）身份的质量画像不存在。"""
 
 
+class BranchError(LakeError):
+    """分支操作失败的基类。"""
+
+
+class BranchNameError(BranchError):
+    """分支名不合法（空名、含非法字符、以 '-' 开头、过长等）。"""
+
+
+class BranchExistsError(BranchError):
+    """分支名已被占用（包括保留名 main）。"""
+
+
+class BranchNotFoundError(BranchError):
+    """指定名字的分支不存在（切换 / 撤销 / 定位尖端时）。"""
+
+
+class ProtectedBranchError(BranchError):
+    """试图撤销受保护的分支（main 不能撤销）。"""
+
+
+class BranchBaseError(BranchError):
+    """建分支时指定的基提交不存在。"""
+
+
+class BranchMismatchError(BranchError):
+    """在一条分支上提交另一条分支的压实计划（跨分支借用成果）。"""
+
+
+class PublishError(LakeError):
+    """publish（把实验尖端交给 main）被拒绝。
+
+    ``reason`` 显式标明拒绝原因：``stale-main``（调用方预期的 main
+    尖端已过期，期间有别的正式写者推进）、``diverged``（两条线已分叉，
+    不是快进）、``source-is-main``（源本身就是 main）。拒绝路径只读，
+    不改变任何一方的尖端、版本或数据文件。
+    """
+
+    def __init__(self, reason: str, message: str, **details):
+        self.reason = reason
+        self.details = details
+        super().__init__(message)
+
+
+class StaleMainError(PublishError):
+    """调用方给出的 expected main 尖端与当前 main 不符。"""
+
+    def __init__(self, expected, actual, source_version=None):
+        self.expected_main_version = expected
+        self.actual_main_version = actual
+        super().__init__(
+            "stale-main",
+            f"expected main tip v{expected}, but main is already at v{actual}; "
+            "another production writer advanced main after the check",
+            expected_main_version=expected,
+            actual_main_version=actual,
+            source_version=source_version,
+        )
+
+
+class DivergedError(PublishError):
+    """main 尖端不是实验尖端的祖先，不能快进；需人工处理，不自动合并。"""
+
+    def __init__(self, main_version, source_version, main_parent, source_parent):
+        self.main_version = main_version
+        self.source_version = source_version
+        super().__init__(
+            "diverged",
+            f"cannot fast-forward: main tip v{main_version} is not an ancestor "
+            f"of experiment tip v{source_version}; the two lines have diverged "
+            "(no automatic content merge is performed)",
+            main_version=main_version,
+            source_version=source_version,
+            main_parent=main_parent,
+            source_parent=source_parent,
+        )
+
+
+class SourceIsMainError(PublishError):
+    """试图 publish 绑定到 main 的表（没有实验尖端可交付）。"""
+
+    def __init__(self, version):
+        super().__init__(
+            "source-is-main",
+            f"table is bound to main (tip v{version}); nothing to publish",
+            source_version=version,
+        )
+
+
 class SplitError(LakeError):
     """分组抽样切分无法产出（整次拒绝，不留下任何交付物）。
 

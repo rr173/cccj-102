@@ -138,7 +138,8 @@ class ProfileStore:
 
     def current_target_version(self, version: int | None) -> int:
         if version is None:
-            return mf.current_version(self.table.meta_root)
+            return self.table.current_version()  # 绑定分支的尖端（main 即 HEAD）
+
         v = int(version)
         if not os.path.exists(mf.version_path(self.table.meta_root, v)):
             raise ProfileNotFoundError(f"修订号 {v} 不存在")
